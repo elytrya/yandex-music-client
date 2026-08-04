@@ -14,11 +14,12 @@ import {
   nextSourceToken,
   resumeAudioContext,
   safePlay,
+  resumeOnGesture,
 } from "@/lib/audio";
 import { readCache, releaseMemoryCache, swr, writeCache } from "@/lib/cache";
 import { proxyStream } from "@/lib/stream";
 import { censorUrl, ensureCensorList } from "@/lib/censor";
-import { createLogger } from "@/lib/log";
+import { createLogger, logQuality } from "@/lib/log";
 import { useEqualizerStore } from "@/stores/equalizer";
 import { useLibraryStore } from "@/stores/library";
 import { useSleepStore } from "@/stores/sleep";
@@ -45,13 +46,10 @@ interface PrefetchEntry {
   bitrate: number | null;
   local: boolean;
   censored: boolean;
+  source: string;
 }
 
 const prefetched = new Map<string, PrefetchEntry>();
-const warmup = new Audio();
-warmup.preload = "auto";
-warmup.muted = true;
-warmup.volume = 0;
 
 function rememberPrefetch(id: string, entry: PrefetchEntry): void {
   prefetched.delete(id);
@@ -79,6 +77,7 @@ interface PlayerState {
   shuffle: boolean;
   currentCodec: string | null;
   currentBitrate: number | null;
+  currentSource: string | null;
   playingLocal: boolean;
   censorReplaced: boolean;
   loading: boolean;
@@ -124,6 +123,7 @@ export const usePlayerStore = defineStore("player", {
       shuffle: false,
       currentCodec: null,
       currentBitrate: null,
+      currentSource: null,
       playingLocal: false,
       censorReplaced: false,
       loading: false,
@@ -375,8 +375,7 @@ export const usePlayerStore = defineStore("player", {
 
     releaseMemory() {
       prefetched.clear();
-      warmup.removeAttribute("src");
-      warmup.load();
+      void api.clearStreamCache().catch(() => undefined);
       releaseMemoryCache();
       this.lyrics = null;
       this.showLyrics = false;
@@ -546,6 +545,14 @@ export const usePlayerStore = defineStore("player", {
           this.censorReplaced = ready.censored;
           this.currentCodec = ready.codec;
           this.currentBitrate = ready.bitrate;
+          this.currentSource = ready.source;
+          logQuality({
+            title: track.title,
+            codec: ready.codec,
+            bitrate: ready.bitrate,
+            source: ready.source,
+            requested: this.quality,
+          });
           log.info("source from prefetch", track.title);
         }
 
@@ -558,6 +565,14 @@ export const usePlayerStore = defineStore("player", {
             this.playingLocal = true;
             this.currentCodec = local.split(".").pop() ?? null;
             this.currentBitrate = null;
+            this.currentSource = "local-file";
+            logQuality({
+              title: track.title,
+              codec: this.currentCodec,
+              bitrate: null,
+              source: "local-file",
+              requested: this.quality,
+            });
             log.info("source from disk", local);
           }
         }
@@ -569,8 +584,15 @@ export const usePlayerStore = defineStore("player", {
           if (!isCurrentToken(token)) return;
           this.currentCodec = stream.codec;
           this.currentBitrate = stream.bitrate;
+          this.currentSource = stream.source;
           source = proxyStream(stream.url);
-          log.info("source from network", stream.codec, stream.bitrate);
+          logQuality({
+            title: track.title,
+            codec: stream.codec,
+            bitrate: stream.bitrate,
+            source: stream.source,
+            requested: this.quality,
+          });
         }
 
         if (!isCurrentToken(token)) return;
@@ -615,6 +637,13 @@ export const usePlayerStore = defineStore("player", {
         const name = (e as DOMException | undefined)?.name;
         log.error("loadCurrent failed", e);
         if (!isCurrentToken(token) || name === "AbortError") return;
+        if (name === "NotAllowedError") {
+          this.isPlaying = false;
+          resumeOnGesture(() => {
+            void this.play();
+          });
+          return;
+        }
         Notify.create({
           type: "negative",
           message:
@@ -626,56 +655,61 @@ export const usePlayerStore = defineStore("player", {
     },
 
     async prefetchNext() {
-      const next = this.queue[this.index + 1];
-      if (!next || prefetched.has(next.id)) return;
       const ui = useUiStore().settings;
-      if (ui.censorBypass) {
-        const censored = censorUrl(next.id);
-        if (censored) {
-          rememberPrefetch(next.id, {
-            url: censored,
-            codec: null,
-            bitrate: null,
-            local: false,
-            censored: true,
-          });
-          warmup.src = proxyStream(censored);
-          warmup.load();
-          return;
-        }
-      }
-      try {
-        if (ui.preferLocalFiles) {
-          const local = await api
-            .findLocalTrack(next.id, ui.downloadDir || null)
-            .catch(() => null);
-          if (local) {
+      const targets = [this.queue[this.index + 1], this.queue[this.index + 2]]
+        .filter((track): track is Track => Boolean(track))
+        .filter((track) => !prefetched.has(track.id));
+      await Promise.all(
+        targets.map(async (next) => {
+        if (ui.censorBypass) {
+          const censored = censorUrl(next.id);
+          if (censored) {
             rememberPrefetch(next.id, {
-              url: convertFileSrc(local),
-              codec: local.split(".").pop() ?? null,
+              url: proxyStream(censored),
+              codec: null,
               bitrate: null,
-              local: true,
-              censored: false,
+              local: false,
+              censored: true,
+              source: "censor-replacement",
             });
-            log.info("prefetched from disk", next.title);
+            void api.prefetchStream(censored).catch(() => undefined);
             return;
           }
         }
-
-        const stream = await api.stream(next.id, this.quality);
-        rememberPrefetch(next.id, {
-          url: proxyStream(stream.url),
-          codec: stream.codec,
-          bitrate: stream.bitrate,
-          local: false,
-          censored: false,
-        });
-        warmup.src = proxyStream(stream.url);
-        warmup.load();
-        log.info("prefetched from network", next.title, stream.codec);
-      } catch (error) {
-        log.warn("prefetch failed", next.title, error);
-      }
+        try {
+          if (ui.preferLocalFiles) {
+            const local = await api
+              .findLocalTrack(next.id, ui.downloadDir || null)
+              .catch(() => null);
+            if (local) {
+              rememberPrefetch(next.id, {
+                url: convertFileSrc(local),
+                codec: local.split(".").pop() ?? null,
+                bitrate: null,
+                local: true,
+                censored: false,
+                source: "local-file",
+              });
+              log.info("prefetched from disk", next.title);
+              return;
+            }
+          }
+          const stream = await api.stream(next.id, this.quality);
+          rememberPrefetch(next.id, {
+            url: proxyStream(stream.url),
+            codec: stream.codec,
+            bitrate: stream.bitrate,
+            local: false,
+            censored: false,
+            source: stream.source,
+          });
+          await api.prefetchStream(stream.url).catch(() => undefined);
+          log.info("prefetched from network", next.title, stream.codec);
+        } catch (error) {
+          log.warn("prefetch failed", next.title, error);
+        }
+        }),
+      );
     },
 
     async loadLyrics() {
@@ -732,8 +766,23 @@ export const usePlayerStore = defineStore("player", {
         const stream = await api.stream(this.current.id, quality);
         this.currentCodec = stream.codec;
         this.currentBitrate = stream.bitrate;
+        this.currentSource = stream.source;
+        logQuality({
+          title: this.current.title,
+          codec: stream.codec,
+          bitrate: stream.bitrate,
+          source: stream.source,
+          requested: quality,
+        });
+        await api.prefetchStream(stream.url).catch(() => undefined);
         audio.src = proxyStream(stream.url);
-        audio.currentTime = position;
+        const restore = () => {
+          audio.removeEventListener("loadedmetadata", restore);
+          try {
+            audio.currentTime = position;
+          } catch {}
+        };
+        audio.addEventListener("loadedmetadata", restore);
         audio.playbackRate = this.playbackRate;
         if (wasPlaying) await safePlay();
       } catch {

@@ -22,7 +22,7 @@
     <div class="about-rows">
       <div class="about-row">
         <span class="about-key">Версия</span>
-        <span class="about-val">a0.1</span>
+        <span class="about-val">a0.2</span>
       </div>
       <div class="about-row">
         <span class="about-key">Лицензия</span>

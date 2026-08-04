@@ -53,3 +53,33 @@ export function createLogger(scope: string): Logger {
 }
 
 export const isDev = DEV;
+
+export interface QualityReport {
+  title?: string;
+  codec: string | null;
+  bitrate: number | null;
+  source: string;
+  requested: string;
+}
+
+export function logQuality(report: QualityReport): void {
+  const codec = (report.codec || "unknown").toUpperCase();
+  const rate =
+    report.bitrate && report.bitrate > 0
+      ? `${report.bitrate} kbps`
+      : codec === "FLAC"
+        ? "lossless"
+        : "bitrate n/a";
+  const lossless = codec === "FLAC" || codec === "ALAC" || codec === "WAV";
+  const style = lossless
+    ? "color:#4ade80;font-weight:600"
+    : "color:#ffb74d;font-weight:600";
+  console.info(
+    `%c[quality]%c ${codec} ${rate} %c| запрошено: ${report.requested} | источник: ${report.source}${
+      report.title ? ` | ${report.title}` : ""
+    }`,
+    style,
+    "color:inherit;font-weight:600",
+    "color:#a1a1a8",
+  );
+}

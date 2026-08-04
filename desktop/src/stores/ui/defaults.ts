@@ -86,7 +86,7 @@ export const defaultInterfaceSettings: InterfaceSettings = {
   miniButtons: { ...defaultMiniButtons },
   miniShowTime: true,
   miniVisualizer: true,
-  playerVisualizer: false,
+  playerVisualizer: true,
   lyricsFontSize: 36,
   lyricsBackgroundBlur: 38,
   lyricsBackgroundOpacity: 48,

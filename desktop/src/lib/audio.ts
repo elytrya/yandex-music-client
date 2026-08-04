@@ -1,5 +1,5 @@
 export const audio = new Audio();
-audio.preload = "metadata";
+audio.preload = "auto";
 audio.crossOrigin = "anonymous";
 
 let sourceToken = 0;
@@ -204,4 +204,19 @@ export function currentLevel(): number {
     sum += v * v;
   }
   return Math.sqrt(sum / levelBuffer.length);
+}
+
+let gestureArmed = false;
+
+export function resumeOnGesture(run: () => void): void {
+  if (gestureArmed) return;
+  gestureArmed = true;
+  const fire = () => {
+    gestureArmed = false;
+    window.removeEventListener("pointerdown", fire);
+    window.removeEventListener("keydown", fire);
+    run();
+  };
+  window.addEventListener("pointerdown", fire, { once: true });
+  window.addEventListener("keydown", fire, { once: true });
 }

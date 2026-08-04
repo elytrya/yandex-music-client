@@ -20,6 +20,12 @@ pub(crate) const LYRICS_SECRET: &str = "p93jhgh689SBReK6ghtw62";
 pub(crate) const FILE_INFO_SECRET: &str = "kzqU4XhfCaY6B6JTHODeq5";
 pub(crate) const MUSIC_CLIENT: &str = "YandexMusicAndroid/24023621";
 pub(crate) const MUSIC_CLIENT_DESKTOP: &str = "YandexMusicDesktopAppWindows/5.13.2";
+pub(crate) const MUSIC_CLIENTS: [&str; 2] = [
+    "YandexMusicDesktopAppWindows/5.60.2",
+    "YandexMusicDesktopAppWindows/5.13.2",
+];
+pub(crate) const PROBE_CODECS: [&str; 3] =
+    ["flac-mp4,flac", "flac", "flac,aac,he-aac,mp3"];
 
 pub struct Yandex {
     http: reqwest::Client,

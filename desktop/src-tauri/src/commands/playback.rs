@@ -15,6 +15,17 @@ pub async fn get_stream(
 }
 
 #[tauri::command]
+pub fn clear_stream_cache() {
+    crate::proxy::clear();
+}
+
+#[tauri::command]
+pub async fn prefetch_stream(url: String) -> Result<(), String> {
+    crate::proxy::warm(url).await;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn get_lyrics(id: String, state: State<'_, AppState>) -> Result<LyricsDto, String> {
     let session = state.session()?;
     Yandex::new(&session.token).lyrics(&id).await

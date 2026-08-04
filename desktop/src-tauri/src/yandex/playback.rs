@@ -5,6 +5,15 @@ use md5::{Digest, Md5};
 use sha2::Sha256;
 use super::*;
 
+static STREAM_CACHE: std::sync::OnceLock<
+    std::sync::Mutex<Vec<(String, StreamDto, std::time::Instant)>>,
+> = std::sync::OnceLock::new();
+
+const STREAM_TTL_SECS: u64 = 240;
+
+static BEST_PROBE: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(usize::MAX);
+
 fn lyrics_from_text(
     track_id: &str,
     text: &str,
@@ -45,8 +54,13 @@ impl Yandex {
             .to_string()
     }
 
-    async fn stream_file_info(&self, track_id: &str, quality: &str) -> Result<StreamDto, String> {
-        let codecs = "flac,aac,he-aac,mp3";
+    async fn stream_file_info(
+        &self,
+        track_id: &str,
+        quality: &str,
+        codecs: &str,
+        client: &str,
+    ) -> Result<StreamDto, String> {
         let transports = "raw";
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -64,7 +78,7 @@ impl Yandex {
             .get(url)
             .timeout(std::time::Duration::from_secs(10))
             .header("Authorization", self.auth())
-            .header("X-Yandex-Music-Client", MUSIC_CLIENT_DESKTOP)
+            .header("X-Yandex-Music-Client", client)
             .header("Accept", "application/json")
             .header("Accept-Language", "ru")
             .send()
@@ -123,20 +137,150 @@ impl Yandex {
             url,
             codec,
             bitrate,
+            source: "get-file-info".to_string(),
         })
     }
 
+    fn lossy(codec: &str) -> bool {
+        let c = codec.to_ascii_lowercase();
+        !(c.contains("flac")
+            || c.contains("alac")
+            || c.starts_with("wav")
+            || c.starts_with("aiff"))
+    }
+
+    fn report(track_id: &str, dto: &StreamDto) {
+        let bitrate = if dto.bitrate > 0 {
+            format!("{} kbps", dto.bitrate)
+        } else {
+            "bitrate n/a".to_string()
+        };
+        println!(
+            "[quality] track {track_id}: {} {} via {}",
+            dto.codec, bitrate, dto.source
+        );
+    }
+
     pub async fn stream(&self, track_id: &str, quality: &str) -> Result<StreamDto, String> {
-        if quality == "lossless" {
-            match self.stream_file_info(track_id, "lossless").await {
-                Ok(dto) => return Ok(dto),
-                Err(err) => eprintln!("get-file-info lossless: {err}"),
-            }
-            if let Ok(dto) = self.stream_legacy(track_id, quality, true).await {
-                return Ok(dto);
+        let key = format!("{track_id}:{quality}");
+        let store = STREAM_CACHE.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+        if let Ok(mut items) = store.lock() {
+            items.retain(|(_, _, at)| at.elapsed().as_secs() < STREAM_TTL_SECS);
+            if let Some((_, dto, _)) = items.iter().find(|(id, _, _)| id == &key) {
+                println!("[quality] track {track_id}: ссылка из кэша ({})", dto.codec);
+                return Ok(dto.clone());
             }
         }
-        self.stream_legacy(track_id, quality, false).await
+        let dto = self.stream_fresh(track_id, quality).await?;
+        if let Ok(mut items) = store.lock() {
+            items.push((key, dto.clone(), std::time::Instant::now()));
+            while items.len() > 24 {
+                items.remove(0);
+            }
+        }
+        Ok(dto)
+    }
+
+    async fn stream_fresh(
+        &self,
+        track_id: &str,
+        quality: &str,
+    ) -> Result<StreamDto, String> {
+        if quality == "lossless" {
+            self.report_entitlements().await;
+            let mut fallback: Option<StreamDto> = None;
+            for (attempt, (client, codecs)) in Self::probe_order().into_iter().enumerate() {
+                match self
+                    .stream_file_info(track_id, "lossless", codecs, client)
+                    .await
+                {
+                    Ok(dto) => {
+                        Self::report(track_id, &dto);
+                        if !Self::lossy(&dto.codec) {
+                            Self::remember_probe(client, codecs);
+                            println!(
+                                "[quality] track {track_id}: lossless получен с попытки {} - {} ({client}, codecs={codecs})",
+                                attempt + 1,
+                                dto.codec
+                            );
+                            return Ok(dto);
+                        }
+                        if fallback.is_none() {
+                            fallback = Some(dto);
+                        }
+                    }
+                    Err(err) => println!(
+                        "[quality] track {track_id}: get-file-info ({client}, codecs={codecs}) failed: {err}"
+                    ),
+                }
+            }
+            if let Some(dto) = fallback {
+                println!(
+                    "[quality] track {track_id}: lossless для этого трека недоступен, играет {} {} kbps",
+                    dto.codec, dto.bitrate
+                );
+                return Ok(dto);
+            }
+            match self.stream_legacy(track_id, quality, true).await {
+                Ok(dto) => {
+                    Self::report(track_id, &dto);
+                    return Ok(dto);
+                }
+                Err(err) => {
+                    println!("[quality] track {track_id}: streaming download-info failed: {err}")
+                }
+            }
+        }
+        let dto = self.stream_legacy(track_id, quality, false).await?;
+        Self::report(track_id, &dto);
+        Ok(dto)
+    }
+
+    fn probe_order() -> Vec<(&'static str, &'static str)> {
+        use std::sync::atomic::Ordering;
+        let mut all: Vec<(&'static str, &'static str)> = Vec::new();
+        for client in MUSIC_CLIENTS {
+            for codecs in PROBE_CODECS {
+                all.push((client, codecs));
+            }
+        }
+        let best = BEST_PROBE.load(Ordering::Relaxed);
+        if best < all.len() {
+            let winner = all.remove(best);
+            all.insert(0, winner);
+        }
+        all
+    }
+
+    fn remember_probe(client: &str, codecs: &str) {
+        use std::sync::atomic::Ordering;
+        let mut index = 0usize;
+        for c in MUSIC_CLIENTS {
+            for k in PROBE_CODECS {
+                if c == client && k == codecs {
+                    BEST_PROBE.store(index, Ordering::Relaxed);
+                    return;
+                }
+                index += 1;
+            }
+        }
+    }
+
+    async fn report_entitlements(&self) {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static DONE: AtomicBool = AtomicBool::new(false);
+        if DONE.swap(true, Ordering::Relaxed) {
+            return;
+        }
+        let Ok(result) = self.get_result("/account/status").await else {
+            return;
+        };
+        for key in ["plus", "subscription", "permissions"] {
+            if let Some(value) = result.get(key) {
+                let dump: String = value.to_string().chars().take(400).collect();
+                println!("[quality] account {key}: {dump}");
+            }
+        }
     }
 
     async fn stream_legacy(
@@ -157,10 +301,12 @@ impl Yandex {
 
         let rank = |i: &YDownloadInfo| -> i64 {
             let br = i.bitrate_in_kbps.unwrap_or(0);
-            let bonus = match i.codec.as_str() {
-                "flac" => 3000,
-                "aac" => 1000,
-                _ => 0,
+            let bonus = if !Self::lossy(&i.codec) {
+                3000
+            } else if i.codec.contains("aac") {
+                1000
+            } else {
+                0
             };
             br + bonus
         };
@@ -183,6 +329,7 @@ impl Yandex {
                 .or_else(|| infos.iter().max_by_key(|i| rank(i))),
             _ => infos.iter().max_by_key(|i| rank(i)),
         }
+
         .ok_or_else(|| "Нет доступных потоков".to_string())?;
 
         let xml = self
@@ -212,6 +359,11 @@ impl Yandex {
             url,
             codec: best.codec.clone(),
             bitrate: best.bitrate_in_kbps.unwrap_or(0),
+            source: if streaming {
+                "download-info+streaming".to_string()
+            } else {
+                "download-info".to_string()
+            },
         })
     }
 

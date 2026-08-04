@@ -6,7 +6,7 @@
 
 неофициальный десктоп-клиент яндекс музыки на tauri 2 и vue 3
 
-[![версия](https://img.shields.io/badge/версия-a0.1-fa2d48?style=flat-square)](https://github.com/elytrya/yandex-music-client/releases)
+[![версия](https://img.shields.io/badge/версия-a0.2-fa2d48?style=flat-square)](https://github.com/elytrya/yandex-music-client/releases)
 [![статус](https://img.shields.io/badge/статус-альфа-orange?style=flat-square)](https://github.com/elytrya/yandex-music-client)
 [![лицензия](https://img.shields.io/badge/лицензия-GPL--3.0-blue?style=flat-square)](LICENSE)
 [![платформы](https://img.shields.io/badge/платформы-windows%20%7C%20linux%20%7C%20macos-lightgrey?style=flat-square)](#сборка)
@@ -18,9 +18,11 @@
 
 [![последний коммит](https://img.shields.io/github/last-commit/elytrya/yandex-music-client?style=flat-square&label=последний%20коммит)](https://github.com/elytrya/yandex-music-client/commits)
 [![звёзды](https://img.shields.io/github/stars/elytrya/yandex-music-client?style=flat-square&label=звёзды)](https://github.com/elytrya/yandex-music-client/stargazers)
-[![задачи](https://img.shields.io/github/issues/elytrya/yandex-music-client?style=flat-square&label=задачи)](https://github.com/elytrya/yandex-music-client/issues)
+[![issues](https://img.shields.io/github/issues/elytrya/yandex-music-client?style=flat-square&label=задачи)](https://github.com/elytrya/yandex-music-client/issues)
 
 </div>
+
+ооо "яндекс" к проекту отношения не имеет.
 
 ## стек
 
@@ -116,6 +118,7 @@
 | воспроизведение | подрезание тишины в конце трека |
 | фильтры контента | обход цензуры, метка о подмене, автодизлайк ai-треков |
 
+
 ## сборка
 
 требуется node 18 или новее, npm, rust stable и системные зависимости tauri 2
@@ -191,13 +194,16 @@ presence), библиотека, настройки интерфейса, тай
 
 - fckcensordata: список треков с незацензуренными версиями
 - slopless: список артистов с музыкой, сгенерированной нейросетями
+- github: аватарка автора в разделе "о проекте"
 
 если источник недоступен, клиент продолжает работать без соответствующей функции.
 
 ## известные ограничения
 
+- используется неофициальное апи, любое его изменение может сломать часть функций
 - без подписки полное воспроизведение недоступно
 - базы цензуры и ai-меток пополняются сообществом и не полны
+- формат локальных настроек может меняться без миграций
 
 ## благодарности
 
@@ -207,6 +213,19 @@ presence), библиотека, настройки интерфейса, тай
 - [Hazzz895/FckCensorData](https://github.com/Hazzz895/FckCensorData) - база ссылок на незацензуренные версии
 - [alexeyfv/slopless](https://github.com/alexeyfv/slopless) - база артистов с ai-музыкой
 
+## дисклеймер
+
+проект написан в образовательных целях, чтобы разобраться с tauri, vue и с тем,
+как устроено неофициальное апи яндекс музыки. это не продукт и не замена
+официальному клиенту.
+
+- используется неофициальное апи. оно не
+  документировано, может измениться или перестать работать в любой момент
+- нужен свой аккаунт с активной подпиской. клиент не обходит платный доступ,
+  не раздаёт чужие токены и не даёт слушать то, что недоступно аккаунту
+- использование неофициального клиента может нарушать условия использования
+  сервиса, вплоть до блокировки аккаунта. риск на пользователе
+
 ## лицензия
 
-gpl-3.0
+gpl-3.0. 

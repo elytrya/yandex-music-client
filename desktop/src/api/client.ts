@@ -195,6 +195,11 @@ export const api = {
   stream: (id: string, quality: Quality = "lossless") =>
     call<Stream>("get_stream", { id, quality }),
 
+  prefetchStream: (url: string) =>
+    call<void>("prefetch_stream", { url }),
+
+  clearStreamCache: () => call<void>("clear_stream_cache"),
+
   lyrics: (id: string) => call<Lyrics>("get_lyrics", { id }),
 
   updateDiscordPresence: (payload: PresencePayload) =>

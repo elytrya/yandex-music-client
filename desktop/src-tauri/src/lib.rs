@@ -42,6 +42,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::prefetch_stream,
+            commands::clear_stream_cache,
             commands::auth_login,
             commands::auth_me,
             commands::auth_logout,

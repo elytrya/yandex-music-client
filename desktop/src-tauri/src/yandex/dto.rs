@@ -75,6 +75,7 @@ pub struct StreamDto {
     pub url: String,
     pub codec: String,
     pub bitrate: i64,
+    pub source: String,
 }
 
 #[derive(Serialize)]
