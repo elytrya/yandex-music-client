@@ -88,6 +88,7 @@ let failed = false;
 
 function route(current: Graph, throughFilters: boolean): void {
   if (current.routed === throughFilters) return;
+  current.routed = throughFilters;
   try {
     current.source.disconnect();
   } catch {}
@@ -98,7 +99,6 @@ function route(current: Graph, throughFilters: boolean): void {
       current.source.connect(analyser);
     } catch {}
   }
-  current.routed = throughFilters;
 }
 
 function build(): Graph | null {
@@ -130,7 +130,8 @@ function build(): Graph | null {
     node.connect(context.destination);
 
     graph = { context, source, preamp, filters, routed: false };
-    route(graph, false);
+    source.connect(context.destination);
+    void context.resume().catch(() => undefined);
     return graph;
   } catch {
     failed = true;
@@ -171,6 +172,9 @@ let levelBuffer: Float32Array | null = null;
 export function ensureAnalyser(): boolean {
   const current = build();
   if (!current) return false;
+  if (current.context.state === "suspended") {
+    void current.context.resume().catch(() => undefined);
+  }
   if (!analyser) {
     analyser = current.context.createAnalyser();
     analyser.fftSize = 1024;
