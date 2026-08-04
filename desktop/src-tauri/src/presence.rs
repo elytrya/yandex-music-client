@@ -471,6 +471,7 @@ pub fn update_discord_presence(
             Ok(())
         }
         Err(first) => {
+            let _ = &first;
             dev_log!("retrying with a fresh connection after: {first}");
             slot.take();
 
