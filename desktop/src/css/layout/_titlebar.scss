@@ -1,0 +1,94 @@
+.win-controls {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  margin-left: 4px;
+}
+
+.win-btn {
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+
+  &:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+
+  &.close:hover {
+    background: #e0323c;
+    color: #fff;
+  }
+}
+
+.topbar {
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(24px) saturate(1.35);
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+  color: var(--fg);
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  height: 46px;
+  padding: 0 0 0 12px;
+  gap: 8px;
+  user-select: none;
+}
+
+.q-header.topbar {
+  border-bottom: 0;
+  background: var(--bg);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.titlebar {
+  height: 40px;
+  padding-left: 8px;
+  gap: 4px;
+}
+
+.topbar-drag-space {
+  align-self: stretch;
+  flex: 1 1 auto;
+}
+
+.titlebar > .icon-btn.round,
+.titlebar > .account .account-avatar {
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.titlebar > .icon-btn.round:hover,
+.titlebar > .account:hover .account-avatar {
+  border-color: var(--line);
+  background: var(--hover);
+}
+
+.win-controls {
+  margin-left: 4px;
+  border-left: 0;
+}
+
+.win-btn {
+  width: 40px;
+}
+
+.win-btn:hover {
+  background: var(--hover);
+}
+
+.topbar-search-wrap {
+  width: min(var(--search-width, 360px), 52vw);
+  min-width: 220px;
+  margin-left: 4px;
+}

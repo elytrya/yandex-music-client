@@ -1,0 +1,174 @@
+.head-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  border-bottom: 1px solid var(--line);
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 26px;
+  min-width: 0;
+}
+
+.head-cover {
+  width: clamp(112px, 15vw, 190px);
+  height: clamp(112px, 15vw, 190px);
+  border-radius: 12px;
+  flex: none;
+}
+
+.head-info {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 4px;
+}
+
+.head-kind {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.head-title {
+  font-size: clamp(24px, 3.4vw, 44px);
+  line-height: 1.06;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: 6px 0 10px;
+  word-break: break-word;
+}
+
+.head-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 13px;
+  color: var(--fg-dim);
+  min-width: 0;
+
+  > span {
+    white-space: nowrap;
+  }
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+
+  .btn,
+  .btn-solid {
+    white-space: nowrap;
+  }
+}
+
+.info-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.info-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.info-value {
+  font-size: 13px;
+  color: var(--fg-dim);
+  margin-top: 3px;
+  word-break: break-word;
+}
+
+.q-page-container {
+  overflow-x: hidden;
+}
+
+.q-page {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.info-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px 24px 26px;
+  width: 430px;
+  max-width: 92vw;
+}
+
+.card,
+.panel,
+.q-menu.menu,
+.info-card {
+  border-radius: var(--radius);
+}
+
+.q-page.q-pa-xl {
+  padding: var(--page-padding, 40px) !important;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin: 34px 0 12px;
+  gap: 12px;
+}
+
+.head-chips {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  gap: 6px;
+}
+
+.artist-about {
+  display: -webkit-box;
+  max-width: 760px;
+  margin: 22px 0 0;
+  overflow: hidden;
+  color: var(--fg-dim);
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.scroll-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 117px);
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.scroll-page-area {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.scroll-page-inner {
+  padding: 28px 32px 46px;
+}

@@ -1,0 +1,115 @@
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.theme-option {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: calc(10.5px * var(--text-scale, 1));
+  text-align: left;
+  cursor: pointer;
+}
+
+.theme-option:hover,
+.theme-option.on {
+  border-color: var(--line);
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.theme-option.on {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.theme-preview {
+  display: flex;
+  align-items: flex-end;
+  height: 42px;
+  gap: 4px;
+  margin-bottom: 7px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: calc(var(--radius) * 0.7);
+}
+
+.theme-preview i {
+  display: block;
+  width: 34%;
+  height: 58%;
+  border-radius: calc(var(--radius) * 0.4);
+}
+
+.theme-preview i:last-child {
+  width: 66%;
+  height: 100%;
+}
+
+.custom-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-accent-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.settings-accent {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  color: #fff;
+  cursor: pointer;
+}
+
+.settings-accent.on {
+  border-color: #fff;
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3px var(--accent);
+}
+
+.color-field {
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+  height: 34px;
+  gap: 8px;
+  padding: 0 9px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) * 0.75);
+  background: var(--surface-2);
+  color: var(--fg-dim);
+  font-size: calc(10px * var(--text-scale, 1));
+  cursor: pointer;
+}
+
+.color-field input {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius) * 0.55);
+  overflow: hidden;
+  background: transparent;
+  cursor: pointer;
+}
+
+.color-field code {
+  margin-left: auto;
+  color: var(--fg-faint);
+  font-size: calc(9.5px * var(--text-scale, 1));
+}

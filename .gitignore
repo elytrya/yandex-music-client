@@ -1,0 +1,17 @@
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+desktop/.quasar/
+
+# Tauri / Rust
+desktop/src-tauri/target/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+.env

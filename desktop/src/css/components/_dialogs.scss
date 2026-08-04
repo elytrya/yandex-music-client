@@ -1,0 +1,136 @@
+.app-modal {
+  display: flex;
+  width: 400px;
+  max-width: 92vw;
+  flex-direction: column;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  gap: 12px;
+}
+
+.app-modal-title {
+  color: var(--fg);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.app-modal-text {
+  color: var(--fg-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.app-modal-field {
+  height: 38px;
+  margin-top: 2px;
+}
+
+.app-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+  gap: 8px;
+}
+
+.app-modal .btn-solid.danger {
+  background: #e5484d;
+  color: #fff;
+}
+
+.app-modal .btn-solid[disabled] {
+  cursor: default;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.picker-modal {
+  width: 620px;
+  max-width: 94vw;
+  gap: 14px;
+}
+
+.picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.picker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.picker-search {
+  width: 100%;
+  height: 34px;
+  flex: 1 1 auto;
+}
+
+.picker-list {
+  display: flex;
+  max-height: 46vh;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  gap: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.picker-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  gap: 10px;
+  text-align: left;
+
+  &:hover {
+    background: var(--hover);
+  }
+
+  &.on {
+    background: var(--surface-2);
+  }
+}
+
+.picker-cover {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+}
+
+.picker-meta {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.picker-empty {
+  padding: 26px 0;
+  text-align: center;
+}
+
+.picker-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

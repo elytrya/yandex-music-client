@@ -1,0 +1,277 @@
+.wave-page {
+  height: calc(100vh - 117px);
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.wave-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.wave-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px var(--page-padding) 52px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.wave-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wave-top-info {
+  min-width: 0;
+}
+
+.wave-top-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.wave-top h1 {
+  margin: 3px 0 0;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wave-top p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wave-top-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.wave-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease,
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  &:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+
+  &:active {
+    transform: scale(0.88);
+  }
+}
+
+.wave-ic-play {
+  width: 38px;
+  height: 38px;
+  background: var(--accent);
+  color: #fff;
+
+  &:hover {
+    background: var(--accent);
+    color: #fff;
+    filter: brightness(1.07);
+  }
+}
+
+.wave-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-dim);
+
+  button {
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+  }
+}
+
+.wave-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.wave-chip {
+  height: 30px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    color: var(--fg);
+    background: var(--hover);
+    border-color: transparent;
+  }
+
+  &.on {
+    color: #fff;
+    background: var(--accent);
+    border-color: transparent;
+  }
+}
+
+.wave-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wave-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.wave-settings-label {
+  min-width: 104px;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.wave-list {
+  display: flex;
+  flex-direction: column;
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 11px;
+    color: var(--fg-faint);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}
+
+.wave-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px;
+  margin: 0 -10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  content-visibility: auto;
+  contain-intrinsic-size: 56px;
+  transition: background 0.14s ease;
+
+  &:hover {
+    background: var(--surface);
+  }
+}
+
+.wave-item-art {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    contain: content;
+  }
+}
+
+.wave-item-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wave-item-title {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wave-item-sub {
+  font-size: 12px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wave-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+
+.wave-item.is-current .wave-item-title {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.wave-item.is-played {
+  opacity: 0.55;
+}
+
+.wave-item-state {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.wave-top-artists .link {
+  cursor: pointer;
+}

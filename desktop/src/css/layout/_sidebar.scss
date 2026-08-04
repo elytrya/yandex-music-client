@@ -1,0 +1,184 @@
+.rightbar {
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  padding: 0 12px;
+  margin: 2px 10px;
+  border-radius: 10px;
+  color: var(--fg-dim);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+
+  &:hover {
+    color: var(--fg);
+    background: var(--hover);
+  }
+
+  &.on {
+    color: var(--fg);
+    background: var(--surface-2);
+  }
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  margin: 1px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.14s ease;
+
+  &:hover {
+    background: var(--hover);
+  }
+
+  &.on {
+    background: var(--surface-2);
+  }
+}
+
+.rightbar .q-drawer__content,
+.sidebar .q-drawer__content {
+  overflow-x: hidden;
+}
+
+.brand {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 18px 20px 10px;
+}
+
+.nav-group {
+  padding: 2px 0 6px;
+}
+
+.nav-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 6px 20px 4px;
+}
+
+.side-head {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  padding: 12px 20px 8px;
+}
+
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px;
+  margin: 1px 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  min-width: 0;
+  transition: background 0.14s ease;
+
+  &:hover {
+    background: var(--hover);
+  }
+
+  &.on {
+    background: var(--surface-2);
+  }
+}
+
+.sidebar {
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+}
+
+.card,
+.btn,
+.btn-solid,
+.icon-btn,
+.play,
+.searchbar,
+.menu,
+.menu-body,
+.q-menu,
+.q-tooltip,
+.row-track,
+.nav,
+.side-item,
+.wheel-tile,
+.info-card,
+.account,
+.profile-menu,
+.profile-menu-avatar,
+.q-field__control,
+.q-notification,
+.q-dialog__inner > div,
+.q-scrollarea__thumb {
+  border-radius: var(--radius) !important;
+}
+
+.sidebar {
+  background: color-mix(in srgb, var(--bg) 86%, var(--surface)) !important;
+}
+
+.rightbar .side-head {
+  flex: 0 0 auto;
+  padding: 14px 16px 6px;
+}
+
+.rightbar .now-block {
+  min-width: 0;
+  flex: 0 0 auto;
+  padding: 2px 16px 10px;
+}
+
+.rightbar .now-empty {
+  flex: 0 0 auto;
+  padding: 2px 16px 10px;
+}
+
+.rightbar .queue-scroll {
+  min-height: 0;
+  padding-bottom: 8px;
+}
+
+.rightbar .side-item {
+  margin: 1px 8px;
+  padding: 6px 8px;
+  gap: 9px;
+}
+
+.rightbar .side-item.is-current {
+  background: var(--surface-2);
+}
+
+.rightbar .side-item.is-current .t-13 {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rightbar .side-item.is-played {
+  opacity: 0.5;
+}
+
+.queue-state {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.rightbar .cover img {
+  display: block;
+}

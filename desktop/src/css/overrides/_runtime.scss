@@ -1,0 +1,112 @@
+.app-shell {
+  background: var(--bg);
+}
+
+.icon-btn.on,
+.nav.on svg,
+.link:hover {
+  color: var(--accent);
+}
+
+.no-glass .topbar,
+.no-glass .q-menu.menu,
+.no-glass .playlist-sticky-head {
+  backdrop-filter: none;
+}
+
+.no-motion *,
+.no-motion *::before,
+.no-motion *::after {
+  scroll-behavior: auto !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+body {
+  font-size: calc(14px * var(--text-scale, 1));
+}
+
+html {
+  font-size: calc(16px * var(--text-scale, 1));
+}
+
+.t-10 {
+  font-size: calc(10px * var(--text-scale, 1)) !important;
+}
+
+.t-11,
+.profile-menu-status,
+.faint.t-11 {
+  font-size: calc(11px * var(--text-scale, 1)) !important;
+}
+
+.t-12,
+.label,
+.dim.t-12,
+.account-name,
+.nav,
+.menu-item,
+.btn,
+.btn-solid,
+.searchbar input {
+  font-size: calc(12px * var(--text-scale, 1)) !important;
+}
+
+.t-13,
+.side-item,
+.track-title,
+.profile-menu-name {
+  font-size: calc(13px * var(--text-scale, 1)) !important;
+}
+
+.t-14,
+.player-title {
+  font-size: calc(14px * var(--text-scale, 1)) !important;
+}
+
+.t-15,
+.player-artist {
+  font-size: calc(15px * var(--text-scale, 1)) !important;
+}
+
+.h1 {
+  font-size: calc(30px * var(--text-scale, 1)) !important;
+}
+
+.h2 {
+  font-size: calc(17px * var(--text-scale, 1)) !important;
+}
+
+html[data-cover-style="square"] .cover:not(.round) {
+  border-radius: 2px !important;
+}
+
+html[data-cover-style="soft"] .cover:not(.round) {
+  border-radius: calc(var(--radius) * 0.8) !important;
+}
+
+html[data-cover-style="rounded"] .cover:not(.round) {
+  border-radius: calc(var(--radius) * 1.5) !important;
+}
+
+html.thin-scrollbar ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+html.thin-scrollbar ::-webkit-scrollbar-thumb {
+  border-width: 1px;
+  border-radius: var(--radius);
+}
+
+html.hide-playlist-covers .sidebar .side-item .cover {
+  display: none;
+}
+
+html.hide-player-artwork .q-footer .cover {
+  display: none;
+}
+
+.no-glass .q-menu.menu {
+  background: var(--surface-2);
+}

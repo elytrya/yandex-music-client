@@ -1,0 +1,93 @@
+.artist-all-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+
+  &:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.65;
+  }
+}
+
+.artist-all-section {
+  margin-top: 26px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.wave-artists {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.wave-artists button {
+  padding: 0 4px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: calc(14px * var(--text-scale, 1));
+  cursor: pointer;
+}
+
+.wave-artists button:hover {
+  color: var(--fg);
+}
+
+.artist-head {
+  overflow: hidden;
+  max-height: 520px;
+  transition:
+    max-height 0.34s ease,
+    opacity 0.24s ease,
+    transform 0.34s ease,
+    margin 0.34s ease;
+}
+
+.artist-head.collapsed {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-8px);
+  margin-bottom: 0;
+  pointer-events: none;
+}
+
+.album-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.album-latest {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  z-index: 2;
+}

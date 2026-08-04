@@ -1,0 +1,100 @@
+html,
+body,
+#q-app {
+  height: 100%;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+input,
+select,
+textarea,
+button,
+optgroup,
+option {
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  color: var(--fg);
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--surface);
+  cursor: pointer;
+}
+
+select option,
+select optgroup {
+  background-color: #17171a;
+  color: #f5f5f7;
+}
+
+body {
+  font-family:
+    "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  background: var(--bg);
+  color: var(--fg);
+  user-select: text;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+.btn,
+.btn-solid,
+.icon-btn,
+.chip,
+.menu,
+.menu-body,
+.menu-item,
+.sidebar,
+.nav-item,
+.head-actions,
+.home-card-play {
+  user-select: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2e2e2e;
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #454545;
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html,
+body {
+  overscroll-behavior: none;
+}
+
+.q-scrollarea__container,
+.track-virtual,
+.scroll-page-area .q-scrollarea__container,
+.settings-scroll,
+.home-scroll,
+.stats-scroll,
+.wave-scroll,
+.playlist-tracks-scroll,
+.sidebar .q-scrollarea__container,
+.rightbar .queue-scroll {
+  overscroll-behavior: contain;
+}
