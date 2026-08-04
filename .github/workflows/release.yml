@@ -1,0 +1,65 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "a*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+            targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            build-essential \
+            curl wget file
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./desktop/src-tauri -> target"
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: install frontend dependencies
+        working-directory: ./desktop
+        run: bun install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: mashiro ${{ github.ref_name }}
+          releaseBody: "сборки для windows, macos и linux"
+          releaseDraft: true
+          prerelease: true
+          args: ${{ matrix.args }}
