@@ -19,7 +19,6 @@
 [![последний коммит](https://img.shields.io/github/last-commit/elytrya/yandex-music-client?style=flat-square&label=последний%20коммит)](https://github.com/elytrya/yandex-music-client/commits)
 [![звёзды](https://img.shields.io/github/stars/elytrya/yandex-music-client?style=flat-square&label=звёзды)](https://github.com/elytrya/yandex-music-client/stargazers)
 [![задачи](https://img.shields.io/github/issues/elytrya/yandex-music-client?style=flat-square&label=задачи)](https://github.com/elytrya/yandex-music-client/issues)
-[![размер кода](https://img.shields.io/github/languages/code-size/elytrya/yandex-music-client?style=flat-square&label=размер%20кода)](https://github.com/elytrya/yandex-music-client)
 
 </div>
 
