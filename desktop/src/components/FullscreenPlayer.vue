@@ -1,6 +1,10 @@
 <template>
-  <Transition name="fs">
-    <div v-if="player.fullscreen && player.current" class="fs-player">
+  <Transition name="fs" :duration="{ enter: 280, leave: 320 }">
+    <div
+      v-if="player.fullscreen && player.current"
+      class="fs-player"
+      :class="{ 'with-queue': showQueue }"
+    >
       <div
         v-if="coverUrl"
         class="fs-backdrop"
@@ -9,6 +13,7 @@
       <div class="fs-shade" />
 
       <div class="fs-top">
+        <div class="fs-drag" @mousedown="onDrag" @dblclick="toggleNative" />
         <div class="fs-top-actions">
           <button class="icon-btn round" @click="openLyrics">
             <Icon name="lyrics" :size="18" />
@@ -182,7 +187,11 @@ import ArtistsLine from "@/components/ArtistsLine.vue";
 import Icon from "@/components/Icon.vue";
 import TrackMenu from "@/components/TrackMenu.vue";
 import { formatDuration } from "@/lib/format";
-import { isNativeFullscreen, setNativeFullscreen } from "@/lib/window";
+import {
+  isNativeFullscreen,
+  setNativeFullscreen,
+  startWindowDrag,
+} from "@/lib/window";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player/index";
 
@@ -218,6 +227,11 @@ function jumpTo(index: number) {
   void player.loadCurrent();
 }
 
+function onDrag(event: MouseEvent) {
+  if (event.button !== 0 || native.value) return;
+  void startWindowDrag(event);
+}
+
 function like() {
   if (player.current) void library.toggleLike(player.current);
 }
@@ -232,17 +246,20 @@ async function toggleNative() {
   native.value = ok ? value : await isNativeFullscreen();
 }
 
-async function close() {
-  if (native.value) {
-    native.value = false;
-    await setNativeFullscreen(false);
-  }
+function close() {
+  const wasNative = native.value;
+  showQueue.value = false;
   player.closeFullscreen();
+  if (!wasNative) return;
+  native.value = false;
+  window.setTimeout(() => {
+    void setNativeFullscreen(false);
+  }, 340);
 }
 
 function onKey(event: KeyboardEvent) {
   if (!player.fullscreen) return;
-  if (event.key === "Escape") void close();
+  if (event.key === "Escape") close();
 }
 
 watch(
