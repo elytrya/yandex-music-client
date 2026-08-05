@@ -161,7 +161,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { QScrollArea } from "quasar";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import Icon from "@/components/Icon.vue";
 import LyricsSettingsPanel from "@/components/lyrics/LyricsSettingsPanel.vue";
 import TrackMenu from "@/components/TrackMenu.vue";
@@ -171,6 +171,7 @@ import { useUiStore } from "@/stores/ui/index";
 
 const player = usePlayerStore();
 const router = useRouter();
+const route = useRoute();
 const ui = useUiStore();
 const settings = computed(() => ({
   fontSize: ui.settings.lyricsFontSize,
@@ -235,6 +236,14 @@ watch(
     if (!el || !area) return;
     const target = Math.max(0, el.offsetTop - area.$el.clientHeight * 0.42);
     area.setScrollPosition("vertical", target, settings.value.motion ? 520 : 0);
+  },
+);
+
+/* переход по ссылке выводит из полноэкранного текста */
+watch(
+  () => route.fullPath,
+  () => {
+    if (player.lyricsFullscreen) player.closeLyrics();
   },
 );
 </script>

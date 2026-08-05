@@ -118,7 +118,7 @@
           </div>
 
           <div class="fs-progress">
-            <span class="t-11 faint">{{ formatDuration(player.progress) }}</span>
+            <span class="t-11 faint">{{ formatDuration(player.progress * 1000) }}</span>
             <q-slider
               dense
               color="red"
@@ -128,7 +128,7 @@
               :step="1"
               @update:model-value="(v) => player.seek(Number(v ?? 0))"
             />
-            <span class="t-11 faint">{{ formatDuration(player.duration) }}</span>
+            <span class="t-11 faint">{{ formatDuration(player.duration * 1000) }}</span>
           </div>
         </div>
 
@@ -183,6 +183,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import ArtistsLine from "@/components/ArtistsLine.vue";
 import Icon from "@/components/Icon.vue";
 import TrackMenu from "@/components/TrackMenu.vue";
@@ -197,6 +198,7 @@ import { usePlayerStore } from "@/stores/player/index";
 
 const player = usePlayerStore();
 const library = useLibraryStore();
+const route = useRoute();
 
 const showQueue = ref(false);
 const native = ref(false);
@@ -276,6 +278,14 @@ watch(
       native.value = false;
       void setNativeFullscreen(false);
     }
+  },
+);
+
+/* любой переход по ссылке закрывает полноэкранный режим */
+watch(
+  () => route.fullPath,
+  () => {
+    if (player.fullscreen) close();
   },
 );
 

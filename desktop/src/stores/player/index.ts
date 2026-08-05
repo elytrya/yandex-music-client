@@ -792,19 +792,37 @@ export const usePlayerStore = defineStore("player", {
     },
 
     async openLyricsFullscreen() {
-      if (!this.current) return;
-      await this.loadLyrics();
-      if (!this.lyrics?.lines?.length) {
-        this.showLyrics = false;
-        this.lyricsFullscreen = false;
-        this.openFullscreen();
+      const track = this.current;
+      if (!track) return;
+
+      const ready =
+        this.lyrics?.track_id === track.id
+          ? this.lyrics
+          : readCache<Lyrics>(`lyrics.${track.id}`);
+
+      /* текст уже есть - сразу открываем его */
+      if (ready?.lines?.length) {
+        this.lyrics = ready;
+        this.lyricsError = null;
+        this.fullscreen = false;
+        this.showLyrics = true;
+        this.lyricsFullscreen = true;
         return;
       }
-      this.fullscreen = false;
-      this.showLyrics = true;
-      this.lyricsFullscreen = true;
-    },
 
+      /* текста нет или он ещё не загружен - без ожидания показываем обложку */
+      this.openFullscreen();
+      await this.loadLyrics();
+      if (
+        this.fullscreen &&
+        this.current?.id === track.id &&
+        this.lyrics?.lines?.length
+      ) {
+        this.fullscreen = false;
+        this.showLyrics = true;
+        this.lyricsFullscreen = true;
+      }
+    },
     toggleLyricsFullscreen() {
       this.lyricsFullscreen = !this.lyricsFullscreen;
     },
