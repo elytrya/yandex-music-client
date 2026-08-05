@@ -43,14 +43,17 @@
       <div class="fs-body">
         <div class="fs-stage">
           <div class="fs-art">
-            <img
-              v-if="coverUrl"
-              :src="coverUrl"
-              decoding="async"
-              alt=""
-              @click="openLyrics"
-            />
-            <Icon v-else name="note" :size="72" class="faint" />
+            <Transition name="fs-swap">
+              <img
+                v-if="coverUrl"
+                :key="coverUrl"
+                :src="coverUrl"
+                decoding="async"
+                alt=""
+                @click="openLyrics"
+              />
+              <Icon v-else name="note" :size="72" class="faint" />
+            </Transition>
 
             <div class="fs-art-hover">
               <div class="fs-art-row">
@@ -110,12 +113,14 @@
             </div>
           </div>
 
-          <div class="fs-meta">
-            <div class="fs-title ellipsis">{{ player.current.title }}</div>
-            <div class="fs-artists ellipsis">
-              <ArtistsLine :artists="player.current.artists" :limit="3" />
+          <Transition name="fs-swap" mode="out-in">
+            <div :key="player.current.id" class="fs-meta">
+              <div class="fs-title ellipsis">{{ player.current.title }}</div>
+              <div class="fs-artists ellipsis">
+                <ArtistsLine :artists="player.current.artists" :limit="3" />
+              </div>
             </div>
-          </div>
+          </Transition>
 
           <div class="fs-progress">
             <span class="t-11 faint">{{ formatDuration(player.progress * 1000) }}</span>

@@ -226,6 +226,18 @@ const glyphs: Record<string, Glyph> = {
   close: { paths: ["M6.4 6.4 17.6 17.6M17.6 6.4 6.4 17.6"] },
   minimize: { paths: ["M5.5 12h13"] },
   maximize: { paths: ["M5.8 5.8h12.4v12.4H5.8z"] },
+  expand: {
+    paths: [
+      "M4 9.5V4h5.5",
+      "M20 14.5V20h-5.5",
+      "M20 9.5V4h-5.5",
+      "M4 14.5V20h5.5",
+      "M4 4l6 6",
+      "M20 20l-6-6",
+      "M20 4l-6 6",
+      "M4 20l6-6",
+    ],
+  },
   restore: { paths: ["M5 8.6h10.4V19H5z", "M8.6 8.6V5h10.4v10.4h-3.6"] },
   plus: { paths: ["M12 5v14M5 12h14"] },
   key: {

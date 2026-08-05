@@ -759,6 +759,11 @@ export const usePlayerStore = defineStore("player", {
           this.lyricsLoading = false;
         },
       });
+
+      /* текста нет - уходим на большую обложку */
+      if (this.lyricsFullscreen && !this.lyrics?.lines?.length) {
+        this.openFullscreen();
+      }
     },
 
     toggleLyrics() {

@@ -12,9 +12,8 @@
         @click="player.openFullscreen()"
         @contextmenu.prevent="openAlbum"
       >
-        <q-tooltip>На полный экран</q-tooltip>
         <div class="player-cover-hover">
-          <Icon name="maximize" :size="15" />
+          <Icon name="expand" :size="16" />
         </div>
         <img
           v-if="player.current?.cover_url"

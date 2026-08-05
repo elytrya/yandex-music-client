@@ -343,3 +343,48 @@
     transform: none;
   }
 }
+
+/* смена трека внутри полноэкранного режима */
+.fs-art .fs-swap-enter-active,
+.fs-art .fs-swap-leave-active {
+  transition:
+    opacity 0.34s ease,
+    transform 0.42s cubic-bezier(0.22, 0.65, 0.28, 1);
+}
+
+.fs-art .fs-swap-leave-active {
+  position: absolute;
+  inset: 0;
+}
+
+.fs-art .fs-swap-enter-from {
+  opacity: 0;
+  transform: scale(1.06);
+}
+
+.fs-art .fs-swap-leave-to {
+  opacity: 0;
+  transform: scale(0.94);
+}
+
+.fs-swap-enter-active {
+  transition:
+    opacity 0.2s ease-out,
+    transform 0.24s cubic-bezier(0.22, 0.65, 0.28, 1);
+}
+
+.fs-swap-leave-active {
+  transition:
+    opacity 0.16s ease-in,
+    transform 0.18s ease-in;
+}
+
+.fs-swap-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.fs-swap-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
