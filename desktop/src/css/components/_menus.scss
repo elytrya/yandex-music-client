@@ -256,3 +256,12 @@
   opacity: 0.4;
   pointer-events: none;
 }
+
+.pl-check {
+  color: var(--accent);
+}
+
+.menu-item.picked > span {
+  color: var(--fg);
+  font-weight: 600;
+}

@@ -282,7 +282,10 @@
       style="position: relative"
     >
       <router-view />
-      <LyricsPanel v-if="lyricsVisible" :style="lyricsBox" />
+      <LyricsPanel
+        v-if="lyricsVisible"
+        :style="player.lyricsFullscreen ? undefined : lyricsBox"
+      />
     </q-page-container>
 
     <div v-if="panels.hidden" class="tray-idle">Играет в фоновом режиме</div>
@@ -296,6 +299,7 @@
 
     <MiniPlayer v-if="panels.mini && !panels.hidden" />
 
+    <FullscreenPlayer />
     <TrackLyricsDialog />
     <AppDialog />
   </q-layout>
@@ -307,6 +311,7 @@ import { useRoute, useRouter } from "vue-router";
 import ArtistsLine from "@/components/ArtistsLine.vue";
 import TrackMenu from "@/components/TrackMenu.vue";
 import Icon from "@/components/Icon.vue";
+import FullscreenPlayer from "@/components/FullscreenPlayer.vue";
 import LyricsPanel from "@/components/LyricsPanel.vue";
 import MiniPlayer from "@/components/MiniPlayer.vue";
 import PlayerBar from "@/components/PlayerBar.vue";

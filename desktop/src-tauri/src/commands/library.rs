@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::state::AppState;
-use crate::yandex::{PlaylistDto, TrackDto, Yandex};
+use crate::yandex::{PlaylistDto, PlaylistTracksDto, TrackDto, Yandex};
 
 #[tauri::command]
 pub async fn get_liked_tracks(state: State<'_, AppState>) -> Result<Vec<TrackDto>, String> {
@@ -13,6 +13,12 @@ pub async fn get_liked_tracks(state: State<'_, AppState>) -> Result<Vec<TrackDto
 pub async fn get_liked_ids(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     let session = state.session()?;
     Yandex::new(&session.token).liked_ids(session.uid).await
+}
+
+#[tauri::command]
+pub async fn get_disliked_ids(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let session = state.session()?;
+    Yandex::new(&session.token).disliked_ids(session.uid).await
 }
 
 #[tauri::command]
@@ -43,6 +49,25 @@ pub async fn set_dislike(
 pub async fn get_playlists(state: State<'_, AppState>) -> Result<Vec<PlaylistDto>, String> {
     let session = state.session()?;
     Yandex::new(&session.token).playlists(session.uid).await
+}
+
+#[tauri::command]
+pub async fn playlist_memberships(
+    kinds: Vec<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<PlaylistTracksDto>, String> {
+    if kinds.is_empty() {
+        return Ok(Vec::new());
+    }
+    let session = state.session()?;
+    let list = kinds
+        .iter()
+        .map(|kind| kind.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    Yandex::new(&session.token)
+        .playlists_track_ids(session.uid, &list)
+        .await
 }
 
 #[tauri::command]

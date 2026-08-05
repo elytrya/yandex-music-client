@@ -7,7 +7,15 @@
     />
 
     <div class="player-left">
-      <div class="cover player-cover" @click="openAlbum">
+      <div
+        class="cover player-cover"
+        @click="player.openFullscreen()"
+        @contextmenu.prevent="openAlbum"
+      >
+        <q-tooltip>На полный экран</q-tooltip>
+        <div class="player-cover-hover">
+          <Icon name="maximize" :size="15" />
+        </div>
         <img
           v-if="player.current?.cover_url"
           loading="lazy"

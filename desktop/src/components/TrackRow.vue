@@ -1,7 +1,13 @@
 <template>
   <div
     class="row-track"
-    :class="{ on: isCurrent, drop: dropTarget, dragging, picked: selected }"
+    :class="{
+      on: isCurrent,
+      drop: dropTarget,
+      dragging,
+      picked: selected,
+      disliked: isDisliked,
+    }"
     :data-track-index="index"
     @dblclick="emit('play')"
     @click="onRowClick"
@@ -56,6 +62,11 @@
           :size="13"
           class="faint row-track-saved"
         />
+
+        <div v-if="isDisliked" class="row-track-disliked">
+          <Icon name="heartOff" :size="13" />
+          <q-tooltip>Отмечен как «Не нравится»</q-tooltip>
+        </div>
 
         <div class="icon-btn xs row-track-dots" @click.stop>
           <Icon name="moreH" :size="15" />
@@ -201,6 +212,7 @@ watch(
 
 const isCurrent = computed(() => player.current?.id === props.track.id);
 const isLiked = computed(() => library.liked(props.track.id));
+const isDisliked = computed(() => library.disliked(props.track.id));
 const reorderable = computed(
   () => props.playlistKind !== null && props.playlistKind !== undefined,
 );

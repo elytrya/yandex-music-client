@@ -47,8 +47,13 @@ pub struct ProfileDto {
 }
 
 #[derive(Serialize)]
-pub struct PlaylistDto {
+pub struct PlaylistTracksDto {
     pub kind: i64,
+    pub track_ids: Vec<String>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct PlaylistDto {    pub kind: i64,
     pub title: String,
     pub track_count: i64,
     pub cover_url: Option<String>,

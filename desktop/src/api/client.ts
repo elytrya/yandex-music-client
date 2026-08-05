@@ -7,6 +7,7 @@ import type {
   FeedbackPayload,
   Lyrics,
   Playlist,
+  PlaylistMembership,
   PresencePayload,
   PresenceStatus,
   Quality,
@@ -84,6 +85,8 @@ export const api = {
   likedTracks: () => call<Track[]>("get_liked_tracks"),
 
   likedIds: () => call<string[]>("get_liked_ids"),
+
+  dislikedIds: () => call<string[]>("get_disliked_ids"),
 
   setLike: (id: string, remove: boolean) =>
     call<boolean>("set_like", { id, remove }),
@@ -187,6 +190,9 @@ export const api = {
 
   playlistTracks: (kind: number | string) =>
     call<Track[]>("get_playlist_tracks", { kind: Number(kind) }),
+
+  playlistMemberships: (kinds: number[]) =>
+    call<PlaylistMembership[]>("playlist_memberships", { kinds }),
 
   track: (id: string) => call<Track>("get_track", { id }),
 

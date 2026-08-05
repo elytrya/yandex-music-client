@@ -1,0 +1,302 @@
+.fs-player {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+  background: #080808;
+  color: #fff;
+}
+
+.fs-backdrop {
+  position: absolute;
+  inset: -12%;
+  background-position: center;
+  background-size: cover;
+  filter: blur(70px) saturate(150%);
+  transform: scale(1.1);
+  opacity: 0.55;
+}
+
+.fs-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.8)),
+    rgba(8, 8, 8, 0.45);
+}
+
+.fs-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.fs-top-label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.fs-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fs-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.fs-stage {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 10px 32px 44px;
+}
+
+.fs-art {
+  position: relative;
+  display: flex;
+  width: min(52vh, 460px);
+  height: min(52vh, 460px);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
+.fs-art img {
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  object-fit: cover;
+}
+
+.fs-art-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.fs-art:hover .fs-art-hover {
+  opacity: 1;
+}
+
+.fs-art-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.fs-ctl {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    transform 0.14s ease;
+}
+
+.fs-ctl:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: scale(1.05);
+}
+
+.fs-ctl:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.fs-ctl.on {
+  color: var(--accent);
+}
+
+.fs-ctl-main {
+  width: 62px;
+  height: 62px;
+  background: #fff;
+  color: #111;
+}
+
+.fs-ctl-main:hover {
+  background: #fff;
+}
+
+.fs-art-row-small .fs-ctl {
+  width: 36px;
+  height: 36px;
+}
+
+.fs-meta {
+  max-width: min(90vw, 620px);
+  text-align: center;
+}
+
+.fs-title {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.fs-artists {
+  margin-top: 6px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.fs-progress {
+  display: flex;
+  width: min(80vw, 560px);
+  align-items: center;
+  gap: 10px;
+}
+
+.fs-progress .q-slider {
+  flex: 1;
+}
+
+.fs-queue {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 3;
+  display: flex;
+  width: 330px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(14, 14, 16, 0.72);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(22px) saturate(140%);
+}
+
+.fs-queue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fs-queue-list {
+  flex: 1;
+  min-height: 0;
+}
+
+.fs-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.fs-queue-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.fs-queue-item.on {
+  color: var(--accent);
+}
+
+.fs-queue-cover {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.lyrics-wrap.lyrics-fs {
+  position: fixed;
+  inset: 0;
+  z-index: 2700;
+  border-radius: 0;
+}
+
+.fs-enter-active,
+.fs-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.26s cubic-bezier(0.22, 0.65, 0.28, 1);
+}
+
+.fs-enter-from,
+.fs-leave-to {
+  opacity: 0;
+  transform: scale(1.04) translateY(14px);
+}
+
+.fs-enter-active .fs-art,
+.fs-leave-active .fs-art {
+  transition: transform 0.28s cubic-bezier(0.22, 0.65, 0.28, 1);
+}
+
+.fs-enter-from .fs-art,
+.fs-leave-to .fs-art {
+  transform: scale(0.88);
+}
+
+.fs-q-enter-active,
+.fs-q-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.24s cubic-bezier(0.22, 0.65, 0.28, 1);
+}
+
+.fs-q-enter-from,
+.fs-q-leave-to {
+  opacity: 0;
+  transform: translateX(26px);
+}
+
+.lyrics-wrap.lyrics-fs {
+  animation: lyrics-fs-in 0.24s ease;
+}
+
+@keyframes lyrics-fs-in {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

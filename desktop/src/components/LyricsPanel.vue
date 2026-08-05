@@ -1,5 +1,10 @@
 <template>
-  <div v-if="player.showLyrics" class="lyrics-wrap" :style="visualStyle">
+  <div
+    v-if="player.showLyrics"
+    class="lyrics-wrap"
+    :class="{ 'lyrics-fs': player.lyricsFullscreen }"
+    :style="visualStyle"
+  >
     <div
       v-if="coverUrl"
       class="lyrics-backdrop"
@@ -42,6 +47,32 @@
           <Icon name="settings" :size="18" />
           <q-tooltip>Настройки текста</q-tooltip>
         </div>
+        <div
+          class="icon-btn round"
+          :class="{ on: player.lyricsFullscreen }"
+          data-no-drag
+          @click="player.toggleLyricsFullscreen()"
+        >
+          <Icon
+            :name="player.lyricsFullscreen ? 'restore' : 'maximize'"
+            :size="16"
+          />
+          <q-tooltip>
+            {{
+              player.lyricsFullscreen
+                ? "Выйти из полного экрана"
+                : "На полный экран"
+            }}
+          </q-tooltip>
+        </div>
+        <div
+          class="icon-btn round"
+          data-no-drag
+          @click="player.openFullscreen()"
+        >
+          <Icon name="album" :size="18" />
+          <q-tooltip>Большая обложка</q-tooltip>
+        </div>
         <div class="icon-btn round" data-no-drag @click="player.toggleLyrics()">
           <Icon name="close" :size="19" />
         </div>
@@ -71,6 +102,7 @@
         <div
           class="lyrics-artwork"
           :class="{ playing: player.isPlaying && settings.motion }"
+          @click="player.toggleLyricsFullscreen()"
         >
           <img loading="lazy" decoding="async" :src="coverUrl" />
           <div

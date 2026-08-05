@@ -1,9 +1,0 @@
-services:
-  backend:
-    build: ./backend
-    ports:
-      - "8787:8787"
-    environment:
-      - VOLNA_HOST=0.0.0.0
-      - VOLNA_PORT=8787
-    restart: unless-stopped

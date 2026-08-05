@@ -42,6 +42,16 @@
       background: color-mix(in srgb, var(--fg) 14%, transparent);
     }
   }
+
+  &.disliked {
+    opacity: 0.42;
+    filter: grayscale(0.6);
+
+    &:hover {
+      opacity: 0.75;
+      filter: none;
+    }
+  }
 }
 
 .row-track-title {
@@ -269,4 +279,10 @@
 
 .btn.danger-btn {
   color: var(--accent);
+}
+
+.row-track-disliked {
+  display: flex;
+  align-items: center;
+  color: var(--fg-faint);
 }

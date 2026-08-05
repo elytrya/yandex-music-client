@@ -46,6 +46,22 @@ impl Yandex {
         Ok(resp.status().as_u16())
     }
 
+    pub async fn disliked_ids(&self, uid: i64) -> Result<Vec<String>, String> {
+        let result = self
+            .get_result(&format!("/users/{uid}/dislikes/tracks"))
+            .await?;
+        Ok(result
+            .get("library")
+            .and_then(|l| l.get("tracks"))
+            .and_then(|t| t.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|x| x.get("id").map(val_to_id))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
     pub async fn liked_ids(&self, uid: i64) -> Result<Vec<String>, String> {
         let result = self
             .get_result(&format!("/users/{uid}/likes/tracks"))
@@ -90,6 +106,39 @@ impl Yandex {
                 owner_uid: p.owner.and_then(|o| o.uid),
             })
             .collect())
+    }
+
+    pub async fn playlists_track_ids(
+        &self,
+        uid: i64,
+        kinds: &str,
+    ) -> Result<Vec<PlaylistTracksDto>, String> {
+        let result = self
+            .get_result(&format!("/users/{uid}/playlists?kinds={kinds}"))
+            .await?;
+        let items = result.as_array().cloned().unwrap_or_default();
+        let mut out = Vec::new();
+        for item in items {
+            let kind = item.get("kind").and_then(|v| v.as_i64()).unwrap_or(0);
+            let mut track_ids = Vec::new();
+            if let Some(tracks) = item.get("tracks").and_then(|v| v.as_array()) {
+                for entry in tracks {
+                    let raw = entry
+                        .get("id")
+                        .or_else(|| entry.get("track").and_then(|t| t.get("id")));
+                    let id = match raw {
+                        Some(serde_json::Value::String(text)) => Some(text.clone()),
+                        Some(serde_json::Value::Number(number)) => Some(number.to_string()),
+                        _ => None,
+                    };
+                    if let Some(id) = id {
+                        track_ids.push(id);
+                    }
+                }
+            }
+            out.push(PlaylistTracksDto { kind, track_ids });
+        }
+        Ok(out)
     }
 
     pub async fn playlist_tracks(&self, uid: i64, kind: i64) -> Result<Vec<TrackDto>, String> {

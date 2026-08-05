@@ -15,6 +15,10 @@ export interface LikedAlbum {
 
 interface LibraryState {
   likedIds: string[];
+  dislikedIds: string[];
+  membership: Record<number, string[]>;
+  membershipAt: number;
+  membershipLoading: boolean;
   likedAlbums: LikedAlbum[];
   playlists: Playlist[];
   pinned: number[];
@@ -61,6 +65,10 @@ function notifyError(e: unknown, fallback: string) {
 export const useLibraryStore = defineStore("library", {
   state: (): LibraryState => ({
     likedIds: [],
+    dislikedIds: [],
+    membership: {},
+    membershipAt: 0,
+    membershipLoading: false,
     likedAlbums: readLikedAlbums(),
     playlists: [],
     pinned: readPinned(),
@@ -69,6 +77,15 @@ export const useLibraryStore = defineStore("library", {
 
   getters: {
     liked: (s) => (id: string) => s.likedIds.includes(id),
+    disliked: (s) => (id: string) => s.dislikedIds.includes(String(id)),
+    inPlaylist: (s) => (kind: number, trackId: string) =>
+      (s.membership[Number(kind)] || []).includes(String(trackId)),
+    playlistsWithTrack: (s) => (trackId: string) =>
+      Object.keys(s.membership)
+        .map((key) => Number(key))
+        .filter((kind) =>
+          (s.membership[kind] || []).includes(String(trackId)),
+        ),
     albumLiked: (s) => (id: string) =>
       s.likedAlbums.some((album) => album.id === String(id)),
     sortedLikedAlbums: (s) =>
@@ -88,11 +105,13 @@ export const useLibraryStore = defineStore("library", {
     async init() {
       if (this.loading) return;
       this.loading = true;
-      const [ids, playlists] = await Promise.all([
+      const [ids, disliked, playlists] = await Promise.all([
         api.likedIds().catch(() => [] as string[]),
+        api.dislikedIds().catch(() => [] as string[]),
         api.playlists().catch(() => [] as Playlist[]),
       ]);
       this.likedIds = ids;
+      this.dislikedIds = disliked.map((id) => String(id));
       this.playlists = playlists;
       this.loading = false;
     },
@@ -240,6 +259,9 @@ export const useLibraryStore = defineStore("library", {
     },
 
     async toggleLike(track: Track) {
+      this.dislikedIds = this.dislikedIds.filter(
+        (id) => id !== String(track.id),
+      );
       const isLiked = this.likedIds.includes(track.id);
       try {
         await api.setLike(track.id, isLiked);
@@ -257,20 +279,78 @@ export const useLibraryStore = defineStore("library", {
     },
 
     async dislike(track: Track) {
+      const already = this.dislikedIds.includes(String(track.id));
       try {
-        await api.setDislike(track.id, false);
+        await api.setDislike(track.id, already);
         this.likedIds = this.likedIds.filter((id) => id !== track.id);
-        Notify.create({ message: "Отметил «Не нравится»" });
+        this.dislikedIds = already
+          ? this.dislikedIds.filter((id) => id !== String(track.id))
+          : [...this.dislikedIds, String(track.id)];
+        Notify.create({
+          message: already
+            ? "Снял «Не нравится»"
+            : "Отметил «Не нравится»",
+        });
       } catch (e) {
         notifyError(e, "Не удалось отметить трек");
       }
     },
 
-    async addToPlaylist(kind: number, track: Track, silent = false) {
+    async loadMembership(force = false) {
+      if (this.membershipLoading) return;
+      const fresh = Date.now() - this.membershipAt < 60_000;
+      if (!force && fresh && Object.keys(this.membership).length) return;
+      const kinds = this.playlists.map((item) => Number(item.kind));
+      if (!kinds.length) return;
+      this.membershipLoading = true;
       try {
+        const rows = await api.playlistMemberships(kinds);
+        const next: Record<number, string[]> = {};
+        for (const row of rows) {
+          next[Number(row.kind)] = row.track_ids.map((id) => String(id));
+        }
+        this.membership = next;
+        this.membershipAt = Date.now();
+      } catch {
+        // отсутствие данных не должно ломать меню
+      } finally {
+        this.membershipLoading = false;
+      }
+    },
+
+    markInPlaylist(kind: number, trackId: string, present: boolean) {
+      const key = Number(kind);
+      const ids = this.membership[key] || [];
+      if (present) {
+        if (!ids.includes(String(trackId))) {
+          this.membership = { ...this.membership, [key]: [...ids, String(trackId)] };
+        }
+        return;
+      }
+      this.membership = {
+        ...this.membership,
+        [key]: ids.filter((id) => id !== String(trackId)),
+      };
+    },
+
+    async togglePlaylistTrack(kind: number, track: Track) {
+      const ids = this.membership[Number(kind)] || [];
+      const at = ids.indexOf(String(track.id));
+      if (at === -1) {
+        const ok = await this.addToPlaylist(kind, track);
+        if (ok) this.markInPlaylist(kind, track.id, true);
+        return ok;
+      }
+      const ok = await this.removeFromPlaylist(kind, track, at);
+      if (ok) this.markInPlaylist(kind, track.id, false);
+      return ok;
+    },
+
+    async addToPlaylist(kind: number, track: Track, silent = false) {      try {
         await api.playlistAdd(kind, track.id, track.album_id || track.id, 0);
         const target = this.playlists.find((p) => p.kind === kind);
         if (target) target.track_count += 1;
+        this.markInPlaylist(kind, track.id, true);
         if (!silent) Notify.create({ message: "Добавил в плейлист" });
         return true;
       } catch (e) {

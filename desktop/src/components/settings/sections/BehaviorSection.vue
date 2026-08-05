@@ -99,6 +99,12 @@
       </div>
 
       <SettingToggle
+        :model-value="ui.settings.autoSkipDisliked"
+        label="Автоскип дизлайкнутых треков"
+        description="Трек, отмеченный как «Не нравится», пропускается автоматически, когда доходит до него очередь. Сам трек остаётся в списке, но выглядит приглушённым."
+        @update:model-value="ui.set('autoSkipDisliked', $event)"
+      />
+      <SettingToggle
         :model-value="ui.settings.trimSilence"
         label="Подрезать тишину в конце трека"
         description="Если последние секунды трека почти беззвучные, приложение не ждёт их и сразу включает следующий трек."

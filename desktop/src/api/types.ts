@@ -44,6 +44,11 @@ export interface Playlist {
   owner_uid: number | null;
 }
 
+export interface PlaylistMembership {
+  kind: number;
+  track_ids: string[];
+}
+
 export interface Stream {
   track_id: string;
   url: string;

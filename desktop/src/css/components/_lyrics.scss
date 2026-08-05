@@ -148,6 +148,7 @@
 }
 
 .lyrics-artwork {
+  cursor: pointer; /* fullscreen */
   position: relative;
   width: min(100%, 430px);
   aspect-ratio: 1;

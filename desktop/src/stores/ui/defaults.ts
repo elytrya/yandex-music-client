@@ -49,6 +49,7 @@ export interface InterfaceSettings {
   discordShowTime: boolean;
   cacheEnabled: boolean;
   downloadDir: string;
+  autoSkipDisliked: boolean;
   preferLocalFiles: boolean;
   crossfadeEnabled: boolean;
   crossfadeSeconds: number;
@@ -103,6 +104,7 @@ export const defaultInterfaceSettings: InterfaceSettings = {
   discordShowTime: true,
   cacheEnabled: true,
   downloadDir: "",
+  autoSkipDisliked: true,
   preferLocalFiles: true,
   crossfadeEnabled: true,
   crossfadeSeconds: 4,

@@ -91,6 +91,8 @@ interface PlayerState {
   lyricsLoading: boolean;
   lyricsError: string | null;
   showLyrics: boolean;
+  lyricsFullscreen: boolean;
+  fullscreen: boolean;
   waveError: string | null;
   presenceError: string | null;
   presenceConnected: boolean;
@@ -103,6 +105,7 @@ let presenceTimer: number | null = null;
 let lastSessionSave = 0;
 let lastProgress = 0;
 let quietSince = 0;
+let skipGuard = 0;
 
 export const usePlayerStore = defineStore("player", {
   state: (): PlayerState => {
@@ -137,6 +140,8 @@ export const usePlayerStore = defineStore("player", {
       lyricsLoading: false,
       lyricsError: null,
       showLyrics: false,
+      lyricsFullscreen: false,
+      fullscreen: false,
       waveError: null,
       presenceError: null,
       presenceConnected: false,
@@ -379,6 +384,8 @@ export const usePlayerStore = defineStore("player", {
       releaseMemoryCache();
       this.lyrics = null;
       this.showLyrics = false;
+      this.lyricsFullscreen = false;
+      this.fullscreen = false;
       if (this.queue.length > 120) {
         const from = Math.max(0, this.index - 20);
         const slice = this.queue.slice(from, from + 120);
@@ -501,6 +508,18 @@ export const usePlayerStore = defineStore("player", {
     async loadCurrent(opts?: { startAt?: number; autoplay?: boolean }) {
       const track = this.queue[this.index];
       if (!track) return;
+      if (
+        useUiStore().settings.autoSkipDisliked &&
+        useLibraryStore().disliked(track.id) &&
+        skipGuard < 30 &&
+        this.index < this.queue.length - 1
+      ) {
+        skipGuard += 1;
+        this.index += 1;
+        await this.loadCurrent(opts);
+        return;
+      }
+      skipGuard = 0;
       const startAt = Math.max(0, opts?.startAt ?? 0);
       const autoplay = opts?.autoplay ?? true;
       this.pendingResume = false;
@@ -753,6 +772,41 @@ export const usePlayerStore = defineStore("player", {
 
     closeLyrics() {
       this.showLyrics = false;
+      this.lyricsFullscreen = false;
+    },
+
+    openFullscreen() {
+      if (!this.current) return;
+      this.lyricsFullscreen = false;
+      this.showLyrics = false;
+      this.fullscreen = true;
+    },
+
+    closeFullscreen() {
+      this.fullscreen = false;
+    },
+
+    toggleFullscreen() {
+      if (this.fullscreen) this.closeFullscreen();
+      else this.openFullscreen();
+    },
+
+    async openLyricsFullscreen() {
+      if (!this.current) return;
+      await this.loadLyrics();
+      if (!this.lyrics?.lines?.length) {
+        this.showLyrics = false;
+        this.lyricsFullscreen = false;
+        this.openFullscreen();
+        return;
+      }
+      this.fullscreen = false;
+      this.showLyrics = true;
+      this.lyricsFullscreen = true;
+    },
+
+    toggleLyricsFullscreen() {
+      this.lyricsFullscreen = !this.lyricsFullscreen;
     },
 
     async setQuality(quality: Quality) {

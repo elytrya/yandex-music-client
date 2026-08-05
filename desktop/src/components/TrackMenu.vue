@@ -46,14 +46,20 @@
         <Icon name="playlistAdd" :size="18" />
         <span class="col">Добавить в плейлист</span>
         <Icon name="chevronRight" :size="15" />
-        <q-menu anchor="top end" self="top start" class="panel menu">
+        <q-menu
+          anchor="top end"
+          self="top start"
+          class="panel menu"
+          @show="library.loadMembership()"
+        >
           <div class="menu-body" style="max-height: 320px; overflow-y: auto">
             <div
               v-for="pl in library.playlists"
               :key="pl.kind"
               class="menu-item"
+              :class="{ picked: library.inPlaylist(pl.kind, track.id) }"
               v-close-popup
-              @click="library.addToPlaylist(pl.kind, track)"
+              @click="library.togglePlaylistTrack(pl.kind, track)"
             >
               <div class="cover menu-cover">
                 <img
@@ -64,7 +70,19 @@
                 />
                 <Icon v-else name="queue" :size="14" class="faint" />
               </div>
-              <span class="ellipsis">{{ pl.title }}</span>
+              <span class="ellipsis col">{{ pl.title }}</span>
+              <Icon
+                v-if="library.inPlaylist(pl.kind, track.id)"
+                name="check"
+                :size="16"
+                class="pl-check"
+              />
+            </div>
+            <div
+              v-if="library.membershipLoading"
+              class="faint t-11 q-px-sm q-pb-xs"
+            >
+              сверяю плейлисты…
             </div>
             <div v-if="!library.playlists.length" class="faint t-12 q-pa-sm">
               Нет плейлистов

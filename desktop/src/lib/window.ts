@@ -2,6 +2,8 @@ type NativeWindow = {
   startDragging: () => Promise<void>;
   toggleMaximize: () => Promise<void>;
   setFocus?: () => Promise<void>;
+  setFullscreen?: (value: boolean) => Promise<void>;
+  isFullscreen?: () => Promise<boolean>;
 };
 
 async function currentWindow(): Promise<NativeWindow | null> {
@@ -47,4 +49,25 @@ export async function toggleWindowMaximize(event: MouseEvent) {
   if (interactive(event.target)) return;
   event.preventDefault();
   await (await currentWindow())?.toggleMaximize();
+}
+
+export async function isNativeFullscreen(): Promise<boolean> {
+  const win = await currentWindow();
+  if (!win?.isFullscreen) return false;
+  try {
+    return await win.isFullscreen();
+  } catch {
+    return false;
+  }
+}
+
+export async function setNativeFullscreen(value: boolean) {
+  const win = await currentWindow();
+  if (!win?.setFullscreen) return false;
+  try {
+    await win.setFullscreen(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
