@@ -798,3 +798,26 @@ html[data-mini] {
     color: var(--fg);
   }
 }
+
+/* переходы между страницами */
+.page-enter-active {
+  transition:
+    opacity 0.2s ease-out,
+    transform 0.26s cubic-bezier(0.22, 0.65, 0.28, 1);
+}
+
+.page-leave-active {
+  transition:
+    opacity 0.14s ease-in,
+    transform 0.16s ease-in;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}

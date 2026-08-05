@@ -12,25 +12,33 @@
 
     <div class="mini-top" @dblclick="panels.exitMini()">
       <div class="cover mini-cover">
-        <img
-          v-if="player.current?.cover_url"
-          :src="player.current.cover_url"
-          decoding="async"
-        />
-        <Icon v-else name="note" :size="18" class="faint" />
+        <Transition name="pb-cover">
+          <img
+            v-if="player.current?.cover_url"
+            :key="player.current.cover_url"
+            :src="player.current.cover_url"
+            decoding="async"
+          />
+          <Icon v-else name="note" :size="18" class="faint" />
+        </Transition>
       </div>
 
       <div class="mini-meta">
-        <div class="mini-title ellipsis">
-          {{ displayTitle }}<AiTag :show="isAiCurrent" />
-        </div>
+        <Transition name="pb-swap" mode="out-in">
+          <div :key="displayTitle" class="mini-title ellipsis">
+            {{ displayTitle }}<AiTag :show="isAiCurrent" />
+          </div>
+        </Transition>
         <div class="mini-artist ellipsis" data-no-drag>
-          <ArtistsLine
-            v-if="player.current"
-            :artists="player.current.artists"
-            :limit="2"
-          />
-          <template v-else>Mashiro</template>
+          <Transition name="pb-swap" mode="out-in">
+            <ArtistsLine
+              v-if="player.current"
+              :key="player.current.id"
+              :artists="player.current.artists"
+              :limit="2"
+            />
+            <span v-else>Mashiro</span>
+          </Transition>
         </div>
         <TrackMenu
           v-if="player.current"
@@ -61,8 +69,20 @@
           :aria-label="player.isPlaying ? 'Пауза' : 'Играть'"
           @click.stop="player.toggle()"
         >
-          <q-spinner v-if="player.loading" size="15px" color="white" />
-          <Icon v-else :name="player.isPlaying ? 'pause' : 'play'" :size="16" />
+          <Transition name="ic-pop" mode="out-in">
+            <q-spinner
+              v-if="player.loading"
+              key="load"
+              size="15px"
+              color="white"
+            />
+            <Icon
+              v-else
+              :key="player.isPlaying ? 'pause' : 'play'"
+              :name="player.isPlaying ? 'pause' : 'play'"
+              :size="16"
+            />
+          </Transition>
         </button>
 
         <button

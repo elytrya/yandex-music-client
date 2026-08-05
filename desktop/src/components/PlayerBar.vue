@@ -15,20 +15,28 @@
         <div class="player-cover-hover">
           <Icon name="expand" :size="16" />
         </div>
-        <img
-          v-if="player.current?.cover_url"
-          loading="lazy"
-          decoding="async"
-          :src="player.current.cover_url"
-        />
-        <Icon v-else name="note" :size="18" class="faint" />
+        <Transition name="pb-cover">
+          <img
+            v-if="player.current?.cover_url"
+            :key="player.current.cover_url"
+            loading="lazy"
+            decoding="async"
+            :src="player.current.cover_url"
+          />
+          <Icon v-else name="note" :size="18" class="faint" />
+        </Transition>
       </div>
 
       <div class="player-meta">
         <div class="player-title-row">
-          <span class="ellipsis t-13 w-600 player-title-text">
-            {{ displayTitle }}
-          </span>
+          <Transition name="pb-swap" mode="out-in">
+            <span
+              :key="displayTitle"
+              class="ellipsis t-13 w-600 player-title-text"
+            >
+              {{ displayTitle }}
+            </span>
+          </Transition>
           <AiTag :show="isAiCurrent" />
           <span v-if="showCensorBadge" class="censor-tag">
             без цензуры
@@ -59,11 +67,14 @@
           </button>
         </div>
         <div class="dim t-12 ellipsis">
-          <ArtistsLine
-            v-if="player.current"
-            :artists="player.current.artists"
-            :limit="2"
-          />
+          <Transition name="pb-swap" mode="out-in">
+            <ArtistsLine
+              v-if="player.current"
+              :key="player.current.id"
+              :artists="player.current.artists"
+              :limit="2"
+            />
+          </Transition>
         </div>
       </div>
 

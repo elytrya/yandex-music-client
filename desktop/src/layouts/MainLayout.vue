@@ -281,7 +281,11 @@
       v-if="!panels.hidden && !panels.mini"
       style="position: relative"
     >
-      <router-view />
+      <router-view v-slot="{ Component, route: current }">
+        <Transition name="page" mode="out-in">
+          <component :is="Component" :key="current.fullPath" />
+        </Transition>
+      </router-view>
       <LyricsPanel
         v-if="lyricsVisible"
         :style="player.lyricsFullscreen ? undefined : lyricsBox"

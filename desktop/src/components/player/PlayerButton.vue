@@ -1,7 +1,14 @@
 <template>
   <div v-if="id === 'play'" class="play play-sm" @click="player.toggle()">
-    <q-spinner v-if="player.loading" size="14px" color="dark" />
-    <Icon v-else :name="player.isPlaying ? 'pause' : 'play'" :size="18" />
+    <Transition name="ic-pop" mode="out-in">
+      <q-spinner v-if="player.loading" key="load" size="14px" color="dark" />
+      <Icon
+        v-else
+        :key="player.isPlaying ? 'pause' : 'play'"
+        :name="player.isPlaying ? 'pause' : 'play'"
+        :size="18"
+      />
+    </Transition>
   </div>
 
   <div
