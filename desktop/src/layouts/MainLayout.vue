@@ -227,17 +227,37 @@
         </div>
         <div v-else class="now-empty faint t-12">Очередь пуста</div>
 
-        <div class="side-head">Очередь</div>
+        <div class="side-head queue-head">
+          <span class="col">Очередь</span>
+          <span v-if="queueItems.length" class="faint t-11 queue-pos">
+            {{ player.index + 1 }} / {{ queueItems.length }}
+          </span>
+          <button
+            v-if="queueItems.length"
+            type="button"
+            class="queue-locate"
+            :class="{ off: followCurrent }"
+            title="Пролистать к текущему треку"
+            @click="locateCurrent"
+          >
+            <Icon name="queue" :size="13" />
+          </button>
+        </div>
 
-        <q-scroll-area class="col queue-scroll">
+        <q-scroll-area
+          ref="queueScroll"
+          class="col queue-scroll"
+          @scroll="onQueueScroll"
+        >
           <div
-            v-for="item in queueWindow"
+            v-for="item in queueItems"
             :key="`${item.track.id}-${item.index}`"
             class="side-item"
             :class="{
               'is-current': item.index === player.index,
               'is-played': item.index < player.index,
             }"
+            :data-queue-current="item.index === player.index ? '1' : null"
             @click="jumpTo(item.index)"
           >
             <div
@@ -267,11 +287,8 @@
             <TrackMenu :context-menu="true" :track="item.track" />
           </div>
 
-          <div v-if="!queueWindow.length" class="faint t-12 q-px-md q-py-sm">
+          <div v-if="!queueItems.length" class="faint t-12 q-px-md q-py-sm">
             Очередь пуста
-          </div>
-          <div v-else-if="queueRest" class="faint t-11 q-px-md q-py-md">
-            и ещё {{ queueRest }} в очереди
           </div>
         </q-scroll-area>
       </div>
@@ -310,7 +327,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ArtistsLine from "@/components/ArtistsLine.vue";
 import TrackMenu from "@/components/TrackMenu.vue";
@@ -403,7 +427,7 @@ const lyricsBox = computed(() => ({
 
 const nav = [
   { to: "/", label: "Главное", icon: "home" },
-  { to: "/wave", label: "Моя волна", icon: "wave" },
+  { to: "/wave", label: "Моя во��на", icon: "wave" },
   { to: "/search", label: "Поиск", icon: "search" },
   { to: "/liked", label: "Мне нравится", icon: "heart" },
   { to: "/playlists", label: "Коллекция", icon: "library" },
@@ -411,28 +435,89 @@ const nav = [
   { to: "/stats", label: "Статистика", icon: "stats" },
 ];
 
-const QUEUE_HISTORY = 15;
-const QUEUE_VISIBLE = 60;
+type ScrollAreaRef = {
+  getScrollTarget: () => HTMLElement;
+  setScrollPosition: (
+    axis: "vertical" | "horizontal",
+    offset: number,
+    duration?: number,
+  ) => void;
+} | null;
 
-const queueWindow = computed(() => {
-  const queue = player.queue ?? [];
-  const idx = player.index;
-  const start = Math.max(0, idx - QUEUE_HISTORY);
-  const end = Math.min(queue.length, idx + 1 + QUEUE_VISIBLE);
-  const out: Array<{ track: (typeof queue)[number]; index: number }> = [];
-  for (let i = start; i < end; i++) {
-    const track = queue[i];
-    if (track) out.push({ track, index: i });
-  }
-  return out;
-});
+const queueScroll = ref<ScrollAreaRef>(null);
+const followCurrent = ref(true);
+let autoScrolling = false;
 
-const queueRest = computed(() =>
-  Math.max(0, player.queue.length - (player.index + 1 + QUEUE_VISIBLE)),
+/** Очередь целиком: и сыгранные треки, и всё, что впереди. */
+const queueItems = computed(() =>
+  (player.queue ?? []).map((track, index) => ({ track, index })),
+);
+
+function currentEl(): { target: HTMLElement; el: HTMLElement } | null {
+  const area = queueScroll.value;
+  if (!area?.getScrollTarget) return null;
+  const target = area.getScrollTarget();
+  const el = target?.querySelector<HTMLElement>('[data-queue-current="1"]');
+  return target && el ? { target, el } : null;
+}
+
+/** Центрирует играющий трек в видимой области очереди. */
+async function scrollToCurrent(duration = 0) {
+  await nextTick();
+  const found = currentEl();
+  const area = queueScroll.value;
+  if (!found || !area) return;
+
+  const { target, el } = found;
+  const offset = el.offsetTop - target.clientHeight / 2 + el.clientHeight / 2;
+
+  autoScrolling = true;
+  area.setScrollPosition("vertical", Math.max(0, offset), duration);
+  window.setTimeout(() => {
+    autoScrolling = false;
+  }, duration + 60);
+}
+
+function isCurrentVisible(): boolean {
+  const found = currentEl();
+  if (!found) return false;
+  const { target, el } = found;
+  const top = el.offsetTop - target.scrollTop;
+  return top > -el.clientHeight && top < target.clientHeight;
+}
+
+function onQueueScroll() {
+  if (autoScrolling) return;
+  followCurrent.value = isCurrentVisible();
+}
+
+function locateCurrent() {
+  followCurrent.value = true;
+  void scrollToCurrent(220);
+}
+
+// При открытии панели сразу показываем текущий трек.
+watch(
+  () => panels.queueOpen,
+  (open) => {
+    if (!open) return;
+    followCurrent.value = true;
+    void scrollToCurrent(0);
+  },
+);
+
+// При смене трека догоняем его, если пользователь не ушёл листать список.
+watch(
+  () => player.index,
+  () => {
+    if (!panels.queueOpen || !followCurrent.value) return;
+    void scrollToCurrent(260);
+  },
 );
 
 function jumpTo(index: number) {
   player.index = index;
+  followCurrent.value = true;
   void player.loadCurrent();
 }
 
@@ -540,3 +625,40 @@ onBeforeUnmount(() => {
   unbindGlobalHotkeyEvents();
 });
 </script>
+
+<style scoped>
+.queue-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.queue-pos {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.queue-locate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent, #fa2d48);
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease,
+    opacity 0.14s ease;
+}
+.queue-locate:hover {
+  background: var(--hover);
+}
+.queue-locate.off {
+  color: var(--fg-dim);
+  opacity: 0.5;
+}
+</style>
