@@ -1,14 +1,14 @@
 .player-bar {
   position: relative;
   display: grid;
-  height: 76px;
+  height: var(--player-height, 76px);
   align-items: center;
   gap: 16px;
-  padding: 0 18px;
-  grid-template-columns: minmax(240px, 1fr) minmax(320px, 1.35fr) minmax(
-      240px,
-      1fr
-    );
+  padding: 0 var(--player-pad, 18px);
+  grid-template-columns:
+    minmax(0, var(--player-meta-width, 260px))
+    minmax(320px, 1.35fr)
+    minmax(0, var(--player-meta-width, 260px));
 }
 
 .player-visualizer {
@@ -44,8 +44,8 @@
 
 .player-cover {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: var(--player-cover, 48px);
+  height: var(--player-cover, 48px);
   flex: 0 0 auto;
   cursor: pointer;
 }
@@ -136,22 +136,30 @@
 .player-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: calc(var(--player-gap, 6px) + 4px);
 }
 
 .player-progress {
   display: flex;
-  width: 100%;
+  width: var(--player-progress-width, 100%);
   max-width: 540px;
   align-items: center;
   gap: 10px;
   flex-wrap: nowrap;
+
+  .q-slider__track-container {
+    --q-slider-track-size: var(--player-progress-thickness, 4px);
+  }
 }
 
 .player-time {
   width: 36px;
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
+
+  .hide-player-times & {
+    display: none;
+  }
 
   &:first-child {
     text-align: right;
@@ -161,7 +169,15 @@
 .player-zone {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--player-gap, 6px);
+}
+
+/* Размер иконок управляется из настроек. */
+.player-zone svg,
+.player-controls svg,
+.player-right svg {
+  width: var(--player-icon, 18px);
+  height: var(--player-icon, 18px);
 }
 
 .player-zone-left {
@@ -174,7 +190,7 @@
   min-width: 0;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
+  gap: var(--player-gap, 6px);
 }
 
 .player-volume {

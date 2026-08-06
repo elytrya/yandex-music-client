@@ -49,6 +49,40 @@
       </div>
     </div>
 
+    <div class="setting-row setting-row-column">
+      <div class="setting-copy">
+        <b>Порядок кнопок</b>
+        <span>
+          Перетащи кнопку на нужное место. Видимость переключается тумблерами
+          ниже.
+        </span>
+      </div>
+
+      <div class="mini-dnd">
+        <div
+          v-for="(id, index) in miniOrder"
+          :key="id"
+          class="dnd-chip"
+          :class="{
+            dragging: dragId === id,
+            hidden: !isVisible(id),
+            locked: lockedMini.has(id),
+          }"
+          :draggable="true"
+          :title="miniLabelOf(id)"
+          @dragstart="dragId = id"
+          @dragend="dragId = null"
+          @dragover.prevent
+          @drop.prevent="dropAt(index)"
+        >
+          <Icon name="drag" :size="12" class="faint" />
+          <Icon :name="miniIconOf(id)" :size="14" />
+          <span class="ellipsis">{{ miniLabelOf(id) }}</span>
+          <Icon v-if="!isVisible(id)" name="close" :size="11" class="faint" />
+        </div>
+      </div>
+    </div>
+
     <div v-for="item in miniCatalog" :key="item.id" class="setting-row">
       <div class="setting-copy setting-copy-icon">
         <span class="setting-glyph"><Icon :name="item.icon" :size="15" /></span>
@@ -80,6 +114,94 @@
       @update:model-value="ui.set('miniVisualizer', $event)"
     />
 
+    <SettingToggle
+      label="Вертикальная громкость"
+      description="При наведении на кнопку громкости разворачивается ползунок вверх. Колёсико мыши тоже меняет громкость."
+      :model-value="ui.settings.miniVolumeSlider"
+      @update:model-value="ui.set('miniVolumeSlider', $event)"
+    />
+
+    <SettingSlider
+      v-if="ui.settings.miniVolumeSlider"
+      label="Длина ползунка громкости"
+      description="Высота вертикальной шкалы."
+      :model-value="ui.settings.miniVolumeHeight"
+      :min="48"
+      :max="200"
+      :step="4"
+      suffix=" px"
+      @update:model-value="ui.set('miniVolumeHeight', $event)"
+    />
+
+    <SettingSlider
+      label="Прозрачность окна"
+      description="Насколько мини-плеер просвечивает."
+      :model-value="ui.settings.miniOpacity"
+      :min="40"
+      :max="100"
+      :step="1"
+      suffix=" %"
+      @update:model-value="ui.set('miniOpacity', $event)"
+    />
+
+    <SettingSlider
+      label="Размер обложки"
+      description="Квадрат с обложкой в шапке."
+      :model-value="ui.settings.miniCoverSize"
+      :min="24"
+      :max="64"
+      :step="1"
+      suffix=" px"
+      @update:model-value="ui.set('miniCoverSize', $event)"
+    />
+
+    <SettingSlider
+      label="Размер иконок"
+      description="Величина кнопок управления."
+      :model-value="ui.settings.miniIconSize"
+      :min="11"
+      :max="24"
+      :step="1"
+      suffix=" px"
+      @update:model-value="ui.set('miniIconSize', $event)"
+    />
+
+    <SettingSlider
+      label="Расстояние между элементами"
+      description="Промежутки между блоками и кнопками."
+      :model-value="ui.settings.miniGap"
+      :min="0"
+      :max="20"
+      :step="1"
+      suffix=" px"
+      @update:model-value="ui.set('miniGap', $event)"
+    />
+
+    <SettingSlider
+      label="Внутренние отступы"
+      description="Поля от края окна до содержимого."
+      :model-value="ui.settings.miniPadding"
+      :min="2"
+      :max="28"
+      :step="1"
+      suffix=" px"
+      @update:model-value="ui.set('miniPadding', $event)"
+    />
+
+    <div class="setting-row">
+      <div class="setting-copy">
+        <b>Сбросить настройки мини-плеера</b>
+        <span>Размеры, прозрачность и громкость вернутся к исходным.</span>
+      </div>
+      <button
+        class="settings-reset-button"
+        type="button"
+        @click="ui.resetMiniLayout()"
+      >
+        Сбросить
+      </button>
+    </div>
+
     <div class="setting-row">
       <div class="setting-copy">
         <b>Сбросить раскладку</b>
@@ -99,28 +221,37 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import Icon from "@/components/Icon.vue";
+import SettingSlider from "@/components/settings/SettingSlider.vue";
 import SettingToggle from "@/components/settings/SettingToggle.vue";
 import type { MiniButtonId } from "@/stores/ui/index";
-import {
-  miniButtonCatalog,
-  miniButtonOrder,
-  useUiStore,
-} from "@/stores/ui/index";
+import { miniButtonCatalog, useUiStore } from "@/stores/ui/index";
 
 const lockedMini = new Set<MiniButtonId>(["prev", "play", "next"]);
 
 const ui = useUiStore();
 
 const miniCatalog = miniButtonCatalog.filter((item) => !item.locked);
-const miniActive = computed(() =>
-  miniButtonOrder.filter(
-    (id) => lockedMini.has(id) || ui.settings.miniButtons[id],
-  ),
-);
+const miniActive = computed(() => ui.activeMiniButtons());
 
-const miniMetaOf = new Map(miniCatalog.map((item) => [item.id, item]));
+/* --- Drag & drop порядка --- */
+
+const miniOrder = computed(() => ui.miniOrderList());
+const dragId = ref<MiniButtonId | null>(null);
+
+function isVisible(id: MiniButtonId): boolean {
+  return lockedMini.has(id) || !!ui.settings.miniButtons[id];
+}
+
+function dropAt(index: number) {
+  const id = dragId.value;
+  dragId.value = null;
+  if (!id) return;
+  ui.moveMiniButton(id, index);
+}
+
+const miniMetaOf = new Map(miniButtonCatalog.map((item) => [item.id, item]));
 
 function miniIconOf(id: MiniButtonId): string {
   return miniMetaOf.get(id)?.icon ?? "note";
@@ -130,3 +261,33 @@ function miniLabelOf(id: MiniButtonId): string {
   return miniMetaOf.get(id)?.label ?? id;
 }
 </script>
+
+<style scoped>
+.mini-dnd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+.dnd-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+  cursor: grab;
+}
+.dnd-chip.dragging {
+  opacity: 0.45;
+}
+.dnd-chip.hidden {
+  opacity: 0.5;
+  border-style: dashed;
+}
+.dnd-chip.locked {
+  border-color: var(--accent);
+}
+</style>

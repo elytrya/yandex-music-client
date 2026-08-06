@@ -57,6 +57,20 @@ export function applyInterfaceSettings(settings: InterfaceSettings): void {
     "--lyrics-bg-blur": `${settings.lyricsBackgroundBlur}px`,
     "--lyrics-bg-opacity": `${settings.lyricsBackgroundOpacity / 100}`,
     "--lyrics-line-blur": `${settings.lyricsLineBlur}px`,
+    "--player-height": `${settings.playerHeight}px`,
+    "--player-cover": `${settings.playerCoverSize}px`,
+    "--player-icon": `${settings.playerIconSize}px`,
+    "--player-gap": `${settings.playerGap}px`,
+    "--player-pad": `${settings.playerSidePadding}px`,
+    "--player-progress-width": `${settings.playerProgressWidth}%`,
+    "--player-progress-thickness": `${settings.playerProgressThickness}px`,
+    "--player-meta-width": `${settings.playerMetaWidth}px`,
+    "--mini-opacity": `${settings.miniOpacity / 100}`,
+    "--mini-cover": `${settings.miniCoverSize}px`,
+    "--mini-icon": `${settings.miniIconSize}px`,
+    "--mini-gap": `${settings.miniGap}px`,
+    "--mini-pad": `${settings.miniPadding}px`,
+    "--mini-volume-height": `${settings.miniVolumeHeight}px`,
   };
 
   for (const [name, value] of Object.entries(vars)) {
@@ -72,5 +86,6 @@ export function applyInterfaceSettings(settings: InterfaceSettings): void {
   root.classList.toggle("thin-scrollbar", settings.thinScrollbar);
   root.classList.toggle("hide-playlist-covers", !settings.showPlaylistCovers);
   root.classList.toggle("hide-player-artwork", !settings.showPlayerArtwork);
+  root.classList.toggle("hide-player-times", !settings.playerShowTimes);
   root.dataset.coverStyle = settings.coverStyle;
 }

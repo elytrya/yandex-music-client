@@ -1,5 +1,15 @@
-import type { MiniButtonSlots, PlayerButtonSlots } from "./playerButtons";
-import { defaultMiniButtons, defaultPlayerButtonSlots } from "./playerButtons";
+import type {
+  MiniButtonId,
+  MiniButtonSlots,
+  PlayerButtonId,
+  PlayerButtonSlots,
+} from "./playerButtons";
+import {
+  defaultMiniButtons,
+  defaultPlayerButtonSlots,
+  miniButtonOrder,
+  playerButtonOrder,
+} from "./playerButtons";
 import type { ThemeName } from "./themes";
 
 export type Density = "compact" | "comfortable" | "spacious";
@@ -30,8 +40,26 @@ export interface InterfaceSettings {
   showPlayerArtwork: boolean;
   playerButtons: PlayerButtonSlots;
   miniButtons: MiniButtonSlots;
+  playerOrder: PlayerButtonId[];
+  miniOrder: MiniButtonId[];
+  playerHeight: number;
+  playerCoverSize: number;
+  playerIconSize: number;
+  playerGap: number;
+  playerSidePadding: number;
+  playerProgressWidth: number;
+  playerProgressThickness: number;
+  playerShowTimes: boolean;
+  playerMetaWidth: number;
   miniShowTime: boolean;
   miniVisualizer: boolean;
+  miniOpacity: number;
+  miniCoverSize: number;
+  miniIconSize: number;
+  miniGap: number;
+  miniPadding: number;
+  miniVolumeSlider: boolean;
+  miniVolumeHeight: number;
   playerVisualizer: boolean;
   lyricsFontSize: number;
   lyricsBackgroundBlur: number;
@@ -85,8 +113,26 @@ export const defaultInterfaceSettings: InterfaceSettings = {
   showPlayerArtwork: true,
   playerButtons: { ...defaultPlayerButtonSlots },
   miniButtons: { ...defaultMiniButtons },
+  playerOrder: [...playerButtonOrder],
+  miniOrder: [...miniButtonOrder],
+  playerHeight: 78,
+  playerCoverSize: 48,
+  playerIconSize: 18,
+  playerGap: 6,
+  playerSidePadding: 16,
+  playerProgressWidth: 100,
+  playerProgressThickness: 4,
+  playerShowTimes: true,
+  playerMetaWidth: 260,
   miniShowTime: true,
   miniVisualizer: true,
+  miniOpacity: 100,
+  miniCoverSize: 38,
+  miniIconSize: 15,
+  miniGap: 6,
+  miniPadding: 10,
+  miniVolumeSlider: true,
+  miniVolumeHeight: 96,
   playerVisualizer: true,
   lyricsFontSize: 36,
   lyricsBackgroundBlur: 38,

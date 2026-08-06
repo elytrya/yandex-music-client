@@ -48,6 +48,32 @@ const STORAGE_KEY = "mashiro.interface";
 
 const lockedMiniButtons = new Set<MiniButtonId>(["prev", "play", "next"]);
 
+/**
+ * Собирает корректный порядок: сначала сохранённые и всё ещё существующие id,
+ * потом всё, что появилось в новых версиях приложения.
+ */
+function sanitizeOrder<T extends string>(
+  saved: unknown,
+  canonical: readonly T[],
+): T[] {
+  const known = new Set<string>(canonical);
+  const seen = new Set<string>();
+  const out: T[] = [];
+
+  if (Array.isArray(saved)) {
+    for (const id of saved) {
+      if (typeof id === "string" && known.has(id) && !seen.has(id)) {
+        seen.add(id);
+        out.push(id as T);
+      }
+    }
+  }
+  for (const id of canonical) {
+    if (!seen.has(id)) out.push(id);
+  }
+  return out;
+}
+
 function load(): InterfaceSettings {
   try {
     const saved = JSON.parse(
@@ -62,6 +88,8 @@ function load(): InterfaceSettings {
       ...defaultMiniButtons,
       ...(saved.miniButtons || {}),
     } as MiniButtonSlots;
+    merged.playerOrder = sanitizeOrder(saved.playerOrder, playerButtonOrder);
+    merged.miniOrder = sanitizeOrder(saved.miniOrder, miniButtonOrder);
     merged.playerButtons.play = "center";
     merged.miniButtons.play = true;
     merged.miniButtons.prev = true;
@@ -100,7 +128,51 @@ export const useUiStore = defineStore("ui", {
     },
 
     playerZoneButtons(zone: PlayerZone): PlayerButtonId[] {
-      return playerButtonOrder.filter((id) => this.playerZone(id) === zone);
+      return this.playerOrderList().filter(
+        (id) => this.playerZone(id) === zone,
+      );
+    },
+
+    playerOrderList(): PlayerButtonId[] {
+      return sanitizeOrder(this.settings.playerOrder, playerButtonOrder);
+    },
+
+    miniOrderList(): MiniButtonId[] {
+      return sanitizeOrder(this.settings.miniOrder, miniButtonOrder);
+    },
+
+    /**
+     * Перекладывает кнопку в зону на конкретную позицию (drag & drop).
+     * `index` — позиция внутри целевой зоны, а не во всём списке.
+     */
+    movePlayerButton(id: PlayerButtonId, zone: PlayerZone, index: number) {
+      if (id === "play") return;
+
+      if (this.settings.playerButtons[id] !== zone) {
+        this.settings.playerButtons = {
+          ...this.settings.playerButtons,
+          [id]: zone,
+        };
+      }
+
+      const order = this.playerOrderList().filter((x) => x !== id);
+      const inZone = order.filter((x) => this.playerZone(x) === zone);
+      const clamped = Math.max(0, Math.min(index, inZone.length));
+      const anchor = inZone[clamped];
+
+      const at = anchor ? order.indexOf(anchor) : order.length;
+      order.splice(at, 0, id);
+
+      this.settings.playerOrder = order;
+      this.apply();
+    },
+
+    moveMiniButton(id: MiniButtonId, index: number) {
+      const order = this.miniOrderList().filter((x) => x !== id);
+      const clamped = Math.max(0, Math.min(index, order.length));
+      order.splice(clamped, 0, id);
+      this.settings.miniOrder = order;
+      this.apply();
     },
 
     setPlayerZone(id: PlayerButtonId, zone: PlayerZone) {
@@ -113,7 +185,7 @@ export const useUiStore = defineStore("ui", {
     },
 
     activeMiniButtons(): MiniButtonId[] {
-      return miniButtonOrder.filter(
+      return this.miniOrderList().filter(
         (id) => lockedMiniButtons.has(id) || this.settings.miniButtons[id],
       );
     },
@@ -125,9 +197,42 @@ export const useUiStore = defineStore("ui", {
     },
 
     resetPlayerButtons() {
+      const d = defaultInterfaceSettings;
       this.settings.playerButtons = { ...defaultPlayerButtonSlots };
       this.settings.miniButtons = { ...defaultMiniButtons };
-      this.settings.miniShowTime = defaultInterfaceSettings.miniShowTime;
+      this.settings.playerOrder = [...playerButtonOrder];
+      this.settings.miniOrder = [...miniButtonOrder];
+      this.settings.miniShowTime = d.miniShowTime;
+      this.apply();
+    },
+
+    /** Сброс только геометрии плеера (размеры, отступы, прогресс). */
+    resetPlayerLayout() {
+      const d = defaultInterfaceSettings;
+      this.settings.playerHeight = d.playerHeight;
+      this.settings.playerCoverSize = d.playerCoverSize;
+      this.settings.playerIconSize = d.playerIconSize;
+      this.settings.playerGap = d.playerGap;
+      this.settings.playerSidePadding = d.playerSidePadding;
+      this.settings.playerProgressWidth = d.playerProgressWidth;
+      this.settings.playerProgressThickness = d.playerProgressThickness;
+      this.settings.playerShowTimes = d.playerShowTimes;
+      this.settings.playerMetaWidth = d.playerMetaWidth;
+      this.apply();
+    },
+
+    /** Сброс только настроек мини-плеера. */
+    resetMiniLayout() {
+      const d = defaultInterfaceSettings;
+      this.settings.miniOpacity = d.miniOpacity;
+      this.settings.miniCoverSize = d.miniCoverSize;
+      this.settings.miniIconSize = d.miniIconSize;
+      this.settings.miniGap = d.miniGap;
+      this.settings.miniPadding = d.miniPadding;
+      this.settings.miniVolumeSlider = d.miniVolumeSlider;
+      this.settings.miniVolumeHeight = d.miniVolumeHeight;
+      this.settings.miniShowTime = d.miniShowTime;
+      this.settings.miniVisualizer = d.miniVisualizer;
       this.apply();
     },
 
