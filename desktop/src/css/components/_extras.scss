@@ -187,20 +187,19 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  width: 30px;
-  max-height: calc(100vh - 12px);
-  padding: 8px 0 10px;
-  border: 1px solid var(--line);
+  gap: 5px;
+  width: 22px;
+  padding: 6px 0 7px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 999px;
-  background: var(--surface-2);
-  box-shadow: var(--shadow-strong, 0 10px 28px rgba(0, 0, 0, 0.45));
+  background: #141414;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
   transform: translateY(-50%);
 }
 
 .mini-vol-value {
   color: var(--fg);
-  font-size: 10px;
+  font-size: 9px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -210,8 +209,8 @@
 .mini-vol-track {
   position: relative;
   width: 4px;
-  /* Не длиннее, чем само окно мини-плеера. */
-  height: min(var(--mini-volume-height, 96px), calc(100vh - 46px));
+  /* Окно мини-плеера всего 152px — шкала обязана оставаться компактной. */
+  height: min(var(--mini-volume-height, 56px), calc(100vh - 96px));
   border-radius: 999px;
   background: color-mix(in srgb, var(--fg) 16%, transparent);
   cursor: pointer;
@@ -239,8 +238,8 @@
   position: absolute;
   top: 0;
   left: 50%;
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--fg);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);

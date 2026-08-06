@@ -126,9 +126,9 @@
       label="Длина ползунка громкости"
       description="Высота вертикальной шкалы."
       :model-value="ui.settings.miniVolumeHeight"
-      :min="48"
-      :max="200"
-      :step="4"
+      :min="32"
+      :max="96"
+      :step="2"
       suffix=" px"
       @update:model-value="ui.set('miniVolumeHeight', $event)"
     />
