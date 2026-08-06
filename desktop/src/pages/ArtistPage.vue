@@ -7,7 +7,10 @@
         </div>
 
         <template v-else-if="artist">
-          <div class="page-head artist-head" :class="{ collapsed: headerCollapsed }">
+          <div
+            class="page-head artist-head"
+            :class="{ collapsed: headerCollapsed }"
+          >
             <div
               class="cover head-cover round"
               :class="{ clickable: coverImages.length }"
@@ -62,31 +65,56 @@
                 </span>
               </div>
 
-              <div v-if="officialLinks.length" class="head-chips">
-                <a
-                  v-for="link in officialLinks"
-                  :key="link.href"
-                  class="chip link"
-                  :href="link.href"
-                  :title="link.href"
-                  @click.prevent="openLink(link.href)"
-                >
+              <div v-if="normalizedLinks.length" class="head-chips">
+                <button class="chip chip-menu" type="button">
                   <Icon name="share" :size="13" />
-                  <span>{{ link.title }}</span>
-                </a>
-              </div>
+                  <span>Ссылки и соцсети</span>
+                  <span class="chip-count">{{ normalizedLinks.length }}</span>
+                  <Icon name="chevronDown" :size="12" />
 
-              <div v-if="socialLinks.length" class="head-chips">
-                <a
-                  v-for="link in socialLinks"
-                  :key="link.href"
-                  class="chip link social"
-                  :href="link.href"
-                  :title="link.href"
-                  @click.prevent="openLink(link.href)"
+                  <q-menu class="menu" anchor="bottom left" self="top left">
+                    <div class="menu-body links-menu">
+                      <template v-if="officialLinks.length">
+                        <div class="menu-label">Официальные</div>
+                        <div
+                          v-for="link in officialLinks"
+                          :key="link.href"
+                          class="menu-item"
+                          :title="link.href"
+                          v-close-popup
+                          @click="openLink(link.href)"
+                        >
+                          <Icon name="share" :size="16" />
+                          <span class="col ellipsis">{{ link.title }}</span>
+                        </div>
+                      </template>
+
+                      <template v-if="socialLinks.length">
+                        <div class="menu-label">Соцсети</div>
+                        <div
+                          v-for="link in socialLinks"
+                          :key="link.href"
+                          class="menu-item"
+                          :title="link.href"
+                          v-close-popup
+                          @click="openLink(link.href)"
+                        >
+                          <Icon name="person" :size="16" />
+                          <span class="col ellipsis">{{ link.title }}</span>
+                        </div>
+                      </template>
+                    </div>
+                  </q-menu>
+                </button>
+
+                <button
+                  class="chip chip-menu"
+                  type="button"
+                  @click="infoOpen = true"
                 >
-                  <span>{{ link.title }}</span>
-                </a>
+                  <Icon name="info" :size="13" />
+                  <span>Подробнее</span>
+                </button>
               </div>
 
               <div v-if="artist.genres.length" class="head-chips">
@@ -224,11 +252,7 @@
                 <button
                   class="btn"
                   type="button"
-                  :title="
-                    albumDir === 'asc'
-                      ? 'По возрастанию'
-                      : 'По убыванию'
-                  "
+                  :title="albumDir === 'asc' ? 'По возрастанию' : 'По убыванию'"
                   @click="albumDir = albumDir === 'asc' ? 'desc' : 'asc'"
                 >
                   <span class="t-13 w-600">{{
@@ -258,10 +282,7 @@
                     />
                     <Icon v-else name="album" :size="26" class="faint" />
 
-                    <div
-                      v-if="album.id === latestAlbumId"
-                      class="album-latest"
-                    >
+                    <div v-if="album.id === latestAlbumId" class="album-latest">
                       Последний релиз
                     </div>
 
@@ -310,6 +331,12 @@
             :images="coverImages"
             :title="artist.name"
           />
+
+          <ArtistInfoDialog
+            v-model:open="infoOpen"
+            :artist="artist"
+            :links="normalizedLinks"
+          />
         </template>
 
         <div v-else class="dim t-13">Не удалось загрузить артиста</div>
@@ -329,9 +356,11 @@ import Icon from "@/components/Icon.vue";
 import LazyTracks from "@/components/LazyTracks.vue";
 import TrackRow from "@/components/TrackRow.vue";
 import ImageViewer from "@/components/ImageViewer.vue";
+import ArtistInfoDialog from "@/components/ArtistInfoDialog.vue";
 import AiTag from "@/components/AiTag.vue";
 import { plural, pluralWord } from "@/lib/format";
 import { readCache, swr } from "@/lib/cache";
+import { recordArtistStats } from "@/lib/artistStats";
 import { ensureAiArtists, isAiArtist } from "@/lib/aiTag";
 import { usePlayerStore } from "@/stores/player/index";
 
@@ -342,6 +371,7 @@ const artist = ref<ArtistPage | null>(null);
 const loading = ref(false);
 const popular = computed(() => artist.value?.tracks ?? []);
 const viewerOpen = ref(false);
+const infoOpen = ref(false);
 const headerCollapsed = ref(false);
 
 type AlbumSort = "year" | "title";
@@ -507,9 +537,12 @@ async function load() {
   artist.value = cached ?? null;
   loading.value = !cached;
 
+  if (cached) recordArtistStats(cached);
+
   await swr<ArtistPage>(key, () => api.artist(props.id), {
     onData: (data) => {
       artist.value = data;
+      recordArtistStats(data);
     },
     onSettled: () => {
       loading.value = false;
@@ -529,6 +562,46 @@ onMounted(load);
 }
 .chip.link.social {
   text-transform: none;
+}
+.chip-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  text-transform: none;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease;
+}
+.chip-menu:hover {
+  background: var(--hover);
+  border-color: var(--fg-dim);
+}
+.chip-count {
+  padding: 0 5px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--fg-dim);
+  font-size: 10px;
+  font-weight: 600;
+}
+.links-menu {
+  min-width: 236px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.menu-label {
+  padding: 8px 12px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
 }
 .head-cover.clickable {
   cursor: pointer;
