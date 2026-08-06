@@ -134,7 +134,7 @@ export const defaultInterfaceSettings: InterfaceSettings = {
   miniGap: 6,
   miniPadding: 10,
   miniVolumeSlider: true,
-  miniVolumeHeight: 56,
+  miniVolumeHeight: 40,
   playerVisualizer: true,
   lyricsFontSize: 36,
   lyricsBackgroundBlur: 38,

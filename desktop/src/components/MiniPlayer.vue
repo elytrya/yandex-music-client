@@ -192,7 +192,6 @@
               data-no-drag
               @wheel.prevent.stop="onVolWheel"
             >
-              <span class="mini-vol-value">{{ volumePercent }}</span>
               <div
                 ref="volTrack"
                 class="mini-vol-track"

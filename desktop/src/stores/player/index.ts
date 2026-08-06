@@ -51,6 +51,18 @@ interface PrefetchEntry {
 
 const prefetched = new Map<string, PrefetchEntry>();
 
+/** Отсекает повторы по id, сохраняя первое вхождение. */
+function dedupeTracks(tracks: Track[], known?: Set<string>): Track[] {
+  const seen = known ?? new Set<string>();
+  const out: Track[] = [];
+  for (const track of tracks) {
+    if (!track?.id || seen.has(track.id)) continue;
+    seen.add(track.id);
+    out.push(track);
+  }
+  return out;
+}
+
 function rememberPrefetch(id: string, entry: PrefetchEntry): void {
   prefetched.delete(id);
   prefetched.set(id, entry);
@@ -452,14 +464,13 @@ export const usePlayerStore = defineStore("player", {
           cursor = nextCursor;
         }
 
-        let tracks = fresh;
+        let tracks = dedupeTracks(fresh);
         if (!tracks.length) {
-          const seenInBatch = new Set<string>();
-          const deduped = fallback.filter((t) => {
-            if (seenInBatch.has(t.id)) return false;
-            seenInBatch.add(t.id);
-            return true;
-          });
+          // Ротор отдал только уже слышанное: чистим повторы.
+          const playing = this.current?.id;
+          const deduped = dedupeTracks(fallback).filter(
+            (t) => t.id !== playing,
+          );
           const offset = deduped.length
             ? Math.floor(Date.now() / 1000) % deduped.length
             : 0;
@@ -473,8 +484,9 @@ export const usePlayerStore = defineStore("player", {
         if (stationName) this.stationName = stationName;
         else if (station === DEFAULT_STATION) this.stationName = "Моя волна";
         this.waveBatchId = batchId;
-        this.queue = tracks;
-        this.sourceQueue = tracks;
+        // Разные массивы: иначе добор волны пишет трек дважды.
+        this.queue = [...tracks];
+        this.sourceQueue = [...tracks];
         this.shuffle = false;
         this.remember(tracks);
         this.index = 0;
@@ -496,8 +508,8 @@ export const usePlayerStore = defineStore("player", {
       startIndex = 0,
       opts?: { wave?: boolean; batchId?: string | null },
     ) {
-      this.sourceQueue = tracks;
-      this.queue = tracks;
+      this.sourceQueue = [...tracks];
+      this.queue = [...tracks];
       this.shuffle = false;
       this.index = startIndex;
       this.isWave = opts?.wave ?? false;
@@ -673,60 +685,91 @@ export const usePlayerStore = defineStore("player", {
       }
     },
 
+    /** Убирает дубли из очереди, не теряя текущий трек. */
+    dedupeQueue() {
+      const seen = new Set<string>();
+      const cleaned: Track[] = [];
+      let index = this.index;
+      this.queue.forEach((track, position) => {
+        if (track?.id && !seen.has(track.id)) {
+          seen.add(track.id);
+          cleaned.push(track);
+          return;
+        }
+        if (position <= index && index > 0) index -= 1;
+      });
+      if (cleaned.length !== this.queue.length) {
+        this.queue = cleaned;
+        this.index = Math.min(index, Math.max(cleaned.length - 1, 0));
+      }
+      const cleanedSource = dedupeTracks(this.sourceQueue);
+      if (cleanedSource.length !== this.sourceQueue.length) {
+        this.sourceQueue = cleanedSource;
+      }
+    },
+
     async prefetchNext() {
       const ui = useUiStore().settings;
+      // В волне сначала добираем треки, иначе предзагружать нечего.
+      if (
+        this.isWave &&
+        !this.fetchingMore &&
+        this.index >= this.queue.length - 2
+      ) {
+        await this.extendWave();
+      }
       const targets = [this.queue[this.index + 1], this.queue[this.index + 2]]
         .filter((track): track is Track => Boolean(track))
         .filter((track) => !prefetched.has(track.id));
       await Promise.all(
         targets.map(async (next) => {
-        if (ui.censorBypass) {
-          const censored = censorUrl(next.id);
-          if (censored) {
-            rememberPrefetch(next.id, {
-              url: proxyStream(censored),
-              codec: null,
-              bitrate: null,
-              local: false,
-              censored: true,
-              source: "censor-replacement",
-            });
-            void api.prefetchStream(censored).catch(() => undefined);
-            return;
-          }
-        }
-        try {
-          if (ui.preferLocalFiles) {
-            const local = await api
-              .findLocalTrack(next.id, ui.downloadDir || null)
-              .catch(() => null);
-            if (local) {
+          if (ui.censorBypass) {
+            const censored = censorUrl(next.id);
+            if (censored) {
               rememberPrefetch(next.id, {
-                url: convertFileSrc(local),
-                codec: local.split(".").pop() ?? null,
+                url: proxyStream(censored),
+                codec: null,
                 bitrate: null,
-                local: true,
-                censored: false,
-                source: "local-file",
+                local: false,
+                censored: true,
+                source: "censor-replacement",
               });
-              log.info("prefetched from disk", next.title);
+              void api.prefetchStream(censored).catch(() => undefined);
               return;
             }
           }
-          const stream = await api.stream(next.id, this.quality);
-          rememberPrefetch(next.id, {
-            url: proxyStream(stream.url),
-            codec: stream.codec,
-            bitrate: stream.bitrate,
-            local: false,
-            censored: false,
-            source: stream.source,
-          });
-          await api.prefetchStream(stream.url).catch(() => undefined);
-          log.info("prefetched from network", next.title, stream.codec);
-        } catch (error) {
-          log.warn("prefetch failed", next.title, error);
-        }
+          try {
+            if (ui.preferLocalFiles) {
+              const local = await api
+                .findLocalTrack(next.id, ui.downloadDir || null)
+                .catch(() => null);
+              if (local) {
+                rememberPrefetch(next.id, {
+                  url: convertFileSrc(local),
+                  codec: local.split(".").pop() ?? null,
+                  bitrate: null,
+                  local: true,
+                  censored: false,
+                  source: "local-file",
+                });
+                log.info("prefetched from disk", next.title);
+                return;
+              }
+            }
+            const stream = await api.stream(next.id, this.quality);
+            rememberPrefetch(next.id, {
+              url: proxyStream(stream.url),
+              codec: stream.codec,
+              bitrate: stream.bitrate,
+              local: false,
+              censored: false,
+              source: stream.source,
+            });
+            await api.prefetchStream(stream.url).catch(() => undefined);
+            log.info("prefetched from network", next.title, stream.codec);
+          } catch (error) {
+            log.warn("prefetch failed", next.title, error);
+          }
         }),
       );
     },
@@ -989,8 +1032,11 @@ export const usePlayerStore = defineStore("player", {
           }
           if (fresh.length) {
             this.queue.push(...fresh);
-            this.sourceQueue.push(...fresh);
+            if (this.sourceQueue !== this.queue) {
+              this.sourceQueue.push(...fresh);
+            }
             this.remember(fresh);
+            this.dedupeQueue();
             added = fresh.length;
           }
         }

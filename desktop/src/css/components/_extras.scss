@@ -182,16 +182,17 @@
 .mini-vol-pop {
   /* Всегда внутри окна мини-плеера: выезжает влево, а не вверх. */
   position: absolute;
-  bottom: calc(100% + 7px);
+  bottom: calc(100% + 6px);
   left: 50%;
   z-index: 30;
   display: flex;
+  max-height: calc(100vh - 96px);
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   width: 26px;
-  padding: 8px 0 10px;
+  /* Симметричные поля под бегунок сверху и снизу. */
+  padding: 7px 0;
   transform: translateX(-50%);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 999px;
@@ -212,8 +213,10 @@
   position: relative;
   width: 4px;
   /* Фиксированная длина — её реально хватает, чтобы тянуть мышью. */
-  flex: 0 0 auto;
-  height: var(--mini-volume-height, 56px);
+  /* Длинная насколько позволяет окно, без выхода за паддинги. */
+  flex: 0 1 auto;
+  height: min(var(--mini-volume-height, 40px), calc(100vh - 110px));
+  min-height: 24px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--fg) 16%, transparent);
   cursor: pointer;
