@@ -219,8 +219,21 @@
   min-height: 24px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--fg) 16%, transparent);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   transition: width 0.12s ease;
+
+  /* Невидимая зона захвата: в четыре пикселя мышью не попасть. */
+  &::before {
+    position: absolute;
+    z-index: 1;
+    content: "";
+    inset: -8px -11px;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
 
   &:hover {
     width: 6px;
@@ -232,6 +245,8 @@
   bottom: 0;
   left: 0;
   width: 100%;
+  /* События всегда достаются дорожке, а не заливке или бегунку. */
+  pointer-events: none;
   border-radius: 999px;
   background: linear-gradient(
     to top,
@@ -244,8 +259,9 @@
   position: absolute;
   top: 0;
   left: 50%;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
   border-radius: 50%;
   background: var(--fg);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);

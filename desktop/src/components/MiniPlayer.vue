@@ -369,15 +369,25 @@ function onVolPointerUp() {
   volDragging = false;
   window.removeEventListener("pointermove", onVolPointerMove);
   window.removeEventListener("pointerup", onVolPointerUp);
+  window.removeEventListener("pointercancel", onVolPointerUp);
   scheduleVolumeClose();
 }
 
 function onVolPointerDown(event: PointerEvent) {
+  // Без preventDefault окно успевает перехватить мышь на себя.
+  event.preventDefault();
   volDragging = true;
   openVolume();
+  // Захват указателя: тянется даже если курсор ушёл с дорожки.
+  try {
+    (event.currentTarget as HTMLElement | null)?.setPointerCapture(
+      event.pointerId,
+    );
+  } catch {}
   volumeFromEvent(event);
   window.addEventListener("pointermove", onVolPointerMove);
   window.addEventListener("pointerup", onVolPointerUp);
+  window.addEventListener("pointercancel", onVolPointerUp);
 }
 
 const vizCanvas = ref<HTMLCanvasElement | null>(null);
