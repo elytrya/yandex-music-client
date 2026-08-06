@@ -179,35 +179,23 @@
 }
 
 .mini-vol-pop {
+  /* Всегда внутри окна мини-плеера: выезжает влево, а не вверх. */
   position: absolute;
-  bottom: calc(100% + 10px);
-  left: 50%;
+  top: 50%;
+  right: calc(100% + 6px);
   z-index: 30;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  width: 34px;
-  padding: 12px 0 14px;
+  gap: 8px;
+  width: 30px;
+  max-height: calc(100vh - 12px);
+  padding: 8px 0 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(var(--glass-blur, 14px));
-  transform: translateX(-50%);
-
-  &::after {
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    width: 8px;
-    height: 8px;
-    border-right: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    background: inherit;
-    content: "";
-    transform: translate(-50%, -55%) rotate(45deg);
-  }
+  background: var(--surface-2);
+  box-shadow: var(--shadow-strong, 0 10px 28px rgba(0, 0, 0, 0.45));
+  transform: translateY(-50%);
 }
 
 .mini-vol-value {
@@ -222,7 +210,8 @@
 .mini-vol-track {
   position: relative;
   width: 4px;
-  height: var(--mini-volume-height, 96px);
+  /* Не длиннее, чем само окно мини-плеера. */
+  height: min(var(--mini-volume-height, 96px), calc(100vh - 46px));
   border-radius: 999px;
   background: color-mix(in srgb, var(--fg) 16%, transparent);
   cursor: pointer;
@@ -273,7 +262,7 @@
 .mini-vol-pop-enter-from,
 .mini-vol-pop-leave-to {
   opacity: 0;
-  transform: translate(-50%, 6px);
+  transform: translate(6px, -50%);
 }
 
 .mini-play {

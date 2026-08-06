@@ -213,7 +213,9 @@
             @wheel.prevent.stop="onVolWheel"
           >
             <Icon :name="volumeIcon" :size="15" />
-            <q-tooltip>Громкость: {{ volumePercent }}%</q-tooltip>
+            <q-tooltip v-if="!volumeOpen">
+              Громкость: {{ volumePercent }}%
+            </q-tooltip>
           </button>
         </div>
       </template>

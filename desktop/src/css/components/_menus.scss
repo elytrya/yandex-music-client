@@ -32,45 +32,11 @@
   }
 }
 
-/* Все всплывашки Quasar тянут цвета из темы, а не из своих светлых дефолтов. */
-.q-menu,
-.q-menu .q-card,
-.q-tooltip,
-.q-dialog__inner > div,
-.q-select__dialog,
-.q-virtual-scroll__content {
-  background: var(--surface-2) !important;
-  color: var(--fg) !important;
-}
-
-.q-menu,
-.q-tooltip {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: 0 16px 40px var(--shadow-strong, rgba(0, 0, 0, 0.55));
-}
-
-.q-item,
-.q-item__label,
-.q-item__section {
-  color: var(--fg);
-}
-
-.q-item:hover,
-.q-item--active,
-.q-manual-focusable--focused > .q-focus-helper {
-  background: var(--hover) !important;
-}
-
-.q-dialog__backdrop {
-  background: rgba(0, 0, 0, 0.62);
-}
-
 .q-menu.menu {
-  background: color-mix(in srgb, var(--surface-2) 94%, transparent) !important;
-  border: 1px solid var(--line);
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 12px;
-  box-shadow: 0 16px 40px var(--shadow-strong, rgba(0, 0, 0, 0.55));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(18px);
 }
 
