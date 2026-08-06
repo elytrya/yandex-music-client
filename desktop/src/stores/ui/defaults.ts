@@ -50,6 +50,7 @@ export interface InterfaceSettings {
   playerProgressWidth: number;
   playerProgressThickness: number;
   playerShowTimes: boolean;
+  playerEditMode: boolean;
   playerMetaWidth: number;
   miniShowTime: boolean;
   miniVisualizer: boolean;
@@ -123,6 +124,7 @@ export const defaultInterfaceSettings: InterfaceSettings = {
   playerProgressWidth: 100,
   playerProgressThickness: 4,
   playerShowTimes: true,
+  playerEditMode: false,
   playerMetaWidth: 260,
   miniShowTime: true,
   miniVisualizer: true,

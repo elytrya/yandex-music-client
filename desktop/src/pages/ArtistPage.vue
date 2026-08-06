@@ -65,58 +65,6 @@
                 </span>
               </div>
 
-              <div v-if="normalizedLinks.length" class="head-chips">
-                <button class="chip chip-menu" type="button">
-                  <Icon name="share" :size="13" />
-                  <span>Ссылки и соцсети</span>
-                  <span class="chip-count">{{ normalizedLinks.length }}</span>
-                  <Icon name="chevronDown" :size="12" />
-
-                  <q-menu class="menu" anchor="bottom left" self="top left">
-                    <div class="menu-body links-menu">
-                      <template v-if="officialLinks.length">
-                        <div class="menu-label">Официальные</div>
-                        <div
-                          v-for="link in officialLinks"
-                          :key="link.href"
-                          class="menu-item"
-                          :title="link.href"
-                          v-close-popup
-                          @click="openLink(link.href)"
-                        >
-                          <Icon name="share" :size="16" />
-                          <span class="col ellipsis">{{ link.title }}</span>
-                        </div>
-                      </template>
-
-                      <template v-if="socialLinks.length">
-                        <div class="menu-label">Соцсети</div>
-                        <div
-                          v-for="link in socialLinks"
-                          :key="link.href"
-                          class="menu-item"
-                          :title="link.href"
-                          v-close-popup
-                          @click="openLink(link.href)"
-                        >
-                          <Icon name="person" :size="16" />
-                          <span class="col ellipsis">{{ link.title }}</span>
-                        </div>
-                      </template>
-                    </div>
-                  </q-menu>
-                </button>
-
-                <button
-                  class="chip chip-menu"
-                  type="button"
-                  @click="infoOpen = true"
-                >
-                  <Icon name="info" :size="13" />
-                  <span>Подробнее</span>
-                </button>
-              </div>
-
               <div v-if="artist.genres.length" class="head-chips">
                 <span
                   v-for="genre in artist.genres.slice(0, 4)"
@@ -189,6 +137,73 @@
                       </div>
                     </div>
                   </q-menu>
+                </button>
+              </div>
+
+              <div class="head-chips head-chips-links">
+                <button
+                  v-if="normalizedLinks.length"
+                  class="chip chip-menu"
+                  type="button"
+                >
+                  <Icon name="share" :size="13" />
+                  <span>Ссылки и соцсети</span>
+                  <span class="chip-count">{{ normalizedLinks.length }}</span>
+                  <Icon name="chevronDown" :size="12" />
+
+                  <q-menu class="menu" anchor="bottom left" self="top left">
+                    <div class="menu-body links-menu">
+                      <template v-if="officialLinks.length">
+                        <div class="menu-label">Официальные</div>
+                        <div
+                          v-for="link in officialLinks"
+                          :key="link.href"
+                          class="menu-item"
+                          :title="link.href"
+                          v-close-popup
+                          @click="openLink(link.href)"
+                        >
+                          <Icon :name="iconForLink(link)" :size="16" />
+                          <span class="col ellipsis">{{ link.title }}</span>
+                        </div>
+                      </template>
+
+                      <template v-if="socialLinks.length">
+                        <div class="menu-label">Соцсети</div>
+                        <div
+                          v-for="link in socialLinks"
+                          :key="link.href"
+                          class="menu-item"
+                          :title="link.href"
+                          v-close-popup
+                          @click="openLink(link.href)"
+                        >
+                          <Icon :name="iconForLink(link)" :size="16" />
+                          <span class="col ellipsis">{{ link.title }}</span>
+                        </div>
+                      </template>
+                    </div>
+                  </q-menu>
+                </button>
+
+                <span
+                  v-for="link in socialLinks.slice(0, 6)"
+                  :key="`ic-${link.href}`"
+                  class="chip chip-social"
+                  role="button"
+                  :title="link.title"
+                  @click="openLink(link.href)"
+                >
+                  <Icon :name="iconForLink(link)" :size="14" />
+                </span>
+
+                <button
+                  class="chip chip-menu"
+                  type="button"
+                  @click="infoOpen = true"
+                >
+                  <Icon name="info" :size="13" />
+                  <span>Подробнее</span>
                 </button>
               </div>
             </div>
@@ -453,6 +468,60 @@ function linkLabel(link: ArtistLink): string {
   return hostOf(link.href);
 }
 
+const socialIcons: Record<string, string> = {
+  vk: "vk",
+  telegram: "telegram",
+  instagram: "instagram",
+  youtube: "youtube",
+  twitter: "twitter",
+  x: "twitter",
+  tiktok: "tiktok",
+  facebook: "facebook",
+  soundcloud: "soundcloud",
+  spotify: "spotify",
+  apple: "apple",
+  itunes: "apple",
+  bandcamp: "bandcamp",
+  twitch: "twitch",
+  dzen: "dzen",
+  zen: "dzen",
+  ok: "ok",
+  odnoklassniki: "ok",
+  discord: "discord",
+};
+
+const hostIcons: Array<[string, string]> = [
+  ["vk.com", "vk"],
+  ["vk.ru", "vk"],
+  ["t.me", "telegram"],
+  ["telegram", "telegram"],
+  ["instagram", "instagram"],
+  ["youtube", "youtube"],
+  ["youtu.be", "youtube"],
+  ["twitter", "twitter"],
+  ["x.com", "twitter"],
+  ["tiktok", "tiktok"],
+  ["facebook", "facebook"],
+  ["fb.com", "facebook"],
+  ["soundcloud", "soundcloud"],
+  ["spotify", "spotify"],
+  ["apple", "apple"],
+  ["bandcamp", "bandcamp"],
+  ["twitch", "twitch"],
+  ["dzen.ru", "dzen"],
+  ["zen.yandex", "dzen"],
+  ["ok.ru", "ok"],
+  ["discord", "discord"],
+];
+
+function iconForLink(link: { network?: string; href: string }): string {
+  const network = (link.network || "").toLowerCase();
+  if (network && socialIcons[network]) return socialIcons[network]!;
+  const host = hostOf(link.href).toLowerCase();
+  const hit = hostIcons.find(([needle]) => host.includes(needle));
+  return hit ? hit[1] : "globe";
+}
+
 const normalizedLinks = computed(() => {
   const list = artist.value?.links ?? [];
   const seen = new Set<string>();
@@ -465,6 +534,7 @@ const normalizedLinks = computed(() => {
     .map((link) => ({
       href: link.href,
       title: linkLabel(link),
+      network: (link.network || "").toLowerCase(),
       social:
         (link.kind || "").toLowerCase() === "social" || Boolean(link.network),
     }));
@@ -563,6 +633,30 @@ onMounted(load);
 .chip.link.social {
   text-transform: none;
 }
+.chip-social {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    color 0.14s ease,
+    background 0.14s ease,
+    transform 0.14s ease;
+}
+
+.chip-social:hover {
+  background: var(--hover);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.head-chips-links {
+  margin-top: 10px;
+}
+
 .chip-menu {
   display: inline-flex;
   align-items: center;

@@ -1,5 +1,41 @@
 <template>
-  <div class="player-bar" :class="{ 'has-viz': ui.settings.playerVisualizer }">
+  <div
+    class="player-bar"
+    :class="{
+      'has-viz': ui.settings.playerVisualizer,
+      'player-edit': editMode,
+    }"
+    @contextmenu.prevent="toggleEdit"
+  >
+    <template v-if="editMode">
+      <div
+        class="pe-grip pe-grip-top"
+        title="Тяни вверх или вниз — высота плеера"
+        @pointerdown="startResize('height', $event)"
+      />
+      <div
+        class="pe-grip pe-grip-meta"
+        title="Тяни влево или вправо — ширина блока с треком"
+        @pointerdown="startResize('meta', $event)"
+      />
+
+      <div class="pe-hint">
+        <Icon name="drag" :size="13" />
+        <span>
+          Режим редактирования: тащи кнопки между зонами, края — размеры
+        </span>
+        <button
+          type="button"
+          class="pe-btn"
+          @click.stop="ui.resetPlayerLayout()"
+        >
+          Сбросить
+        </button>
+        <button type="button" class="pe-btn accent" @click.stop="toggleEdit">
+          Готово
+        </button>
+      </div>
+    </template>
     <canvas
       v-if="ui.settings.playerVisualizer"
       ref="vizCanvas"
@@ -78,14 +114,49 @@
         </div>
       </div>
 
-      <div v-if="leftButtons.length" class="player-zone player-zone-left">
-        <PlayerButton v-for="id in leftButtons" :key="id" :id="id" />
+      <div
+        v-if="leftButtons.length || editMode"
+        class="player-zone player-zone-left"
+        :data-zone-label="editMode ? 'Слева' : null"
+        @dragover.prevent
+        @drop.prevent="dropInZone('left', leftButtons.length)"
+      >
+        <span
+          v-for="(id, index) in leftButtons"
+          :key="id"
+          class="pe-item"
+          :class="{ dragging: dragId === id }"
+          :draggable="editMode"
+          @dragstart="dragId = id"
+          @dragend="dragId = null"
+          @dragover.prevent
+          @drop.prevent.stop="dropInZone('left', index)"
+        >
+          <PlayerButton :id="id" />
+        </span>
       </div>
     </div>
 
     <div class="player-center">
-      <div class="player-controls">
-        <PlayerButton v-for="id in centerButtons" :key="id" :id="id" />
+      <div
+        class="player-controls"
+        :data-zone-label="editMode ? 'Центр' : null"
+        @dragover.prevent
+        @drop.prevent="dropInZone('center', centerButtons.length)"
+      >
+        <span
+          v-for="(id, index) in centerButtons"
+          :key="id"
+          class="pe-item"
+          :class="{ dragging: dragId === id }"
+          :draggable="editMode"
+          @dragstart="dragId = id"
+          @dragend="dragId = null"
+          @dragover.prevent
+          @drop.prevent.stop="dropInZone('center', index)"
+        >
+          <PlayerButton :id="id" />
+        </span>
       </div>
 
       <div class="player-progress">
@@ -108,14 +179,31 @@
       </div>
     </div>
 
-    <div class="player-right">
-      <PlayerButton v-for="id in rightButtons" :key="id" :id="id" />
+    <div
+      class="player-right"
+      :data-zone-label="editMode ? 'Справа' : null"
+      @dragover.prevent
+      @drop.prevent="dropInZone('right', rightButtons.length)"
+    >
+      <span
+        v-for="(id, index) in rightButtons"
+        :key="id"
+        class="pe-item"
+        :class="{ dragging: dragId === id }"
+        :draggable="editMode"
+        @dragstart="dragId = id"
+        @dragend="dragId = null"
+        @dragover.prevent
+        @drop.prevent.stop="dropInZone('right', index)"
+      >
+        <PlayerButton :id="id" />
+      </span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import ArtistsLine from "@/components/ArtistsLine.vue";
 import AiTag from "@/components/AiTag.vue";
@@ -127,6 +215,7 @@ import { formatDuration } from "@/lib/format";
 import { ensureAiArtists, isAiArtist } from "@/lib/aiTag";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player/index";
+import type { PlayerButtonId, PlayerZone } from "@/stores/ui/index";
 import { useUiStore } from "@/stores/ui/index";
 
 const router = useRouter();
@@ -174,6 +263,64 @@ const leftButtons = computed(() => ui.playerZoneButtons("left"));
 const centerButtons = computed(() => ui.playerZoneButtons("center"));
 const rightButtons = computed(() => ui.playerZoneButtons("right"));
 
+/* --- Свободное редактирование прямо на плеере --- */
+
+const editMode = computed(() => ui.settings.playerEditMode);
+const dragId = ref<PlayerButtonId | null>(null);
+
+function toggleEdit() {
+  ui.set("playerEditMode", !ui.settings.playerEditMode);
+}
+
+function dropInZone(zone: PlayerZone, index: number) {
+  const id = dragId.value;
+  dragId.value = null;
+  if (!id) return;
+  ui.movePlayerButton(id, zone, index);
+}
+
+type ResizeKind = "height" | "meta";
+
+let resizeKind: ResizeKind | null = null;
+let startPos = 0;
+let startValue = 0;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function onResizeMove(event: PointerEvent) {
+  if (resizeKind === "height") {
+    ui.set(
+      "playerHeight",
+      clamp(startValue + (startPos - event.clientY), 60, 140),
+    );
+  } else if (resizeKind === "meta") {
+    ui.set(
+      "playerMetaWidth",
+      clamp(startValue + (event.clientX - startPos), 150, 460),
+    );
+  }
+}
+
+function onResizeUp() {
+  resizeKind = null;
+  window.removeEventListener("pointermove", onResizeMove);
+  window.removeEventListener("pointerup", onResizeUp);
+}
+
+function startResize(kind: ResizeKind, event: PointerEvent) {
+  event.preventDefault();
+  resizeKind = kind;
+  startPos = kind === "height" ? event.clientY : event.clientX;
+  startValue =
+    kind === "height" ? ui.settings.playerHeight : ui.settings.playerMetaWidth;
+  window.addEventListener("pointermove", onResizeMove);
+  window.addEventListener("pointerup", onResizeUp);
+}
+
+onBeforeUnmount(onResizeUp);
+
 function openAlbum() {
   const id = player.current?.album_id;
   if (id) void router.push(`/album/${id}`);
@@ -186,6 +333,118 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.pe-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.player-edit {
+  outline: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: -2px;
+}
+
+.player-edit .pe-item {
+  border-radius: 10px;
+  cursor: grab;
+  transition:
+    background 0.14s ease,
+    opacity 0.14s ease;
+}
+
+.player-edit .pe-item > * {
+  pointer-events: none;
+}
+
+.player-edit .pe-item:hover {
+  background: var(--hover);
+}
+
+.player-edit .pe-item.dragging {
+  opacity: 0.4;
+}
+
+.player-edit .player-zone,
+.player-edit .player-controls,
+.player-edit .player-right {
+  position: relative;
+  min-width: 42px;
+  min-height: 34px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 12px;
+}
+
+.player-edit [data-zone-label]::before {
+  position: absolute;
+  top: -9px;
+  left: 8px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--fg-faint);
+  content: attr(data-zone-label);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pe-grip {
+  position: absolute;
+  z-index: 14;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.pe-grip-top {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  cursor: ns-resize;
+}
+
+.pe-grip-meta {
+  top: 20%;
+  left: var(--player-meta-width, 260px);
+  width: 5px;
+  height: 60%;
+  border-radius: 3px;
+  cursor: ew-resize;
+}
+
+.pe-hint {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-strong, 0 10px 28px rgba(0, 0, 0, 0.45));
+  color: var(--fg-dim);
+  font-size: 11px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.pe-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pe-btn.accent {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
 .censor-tag {
   display: inline-flex;
   align-items: center;

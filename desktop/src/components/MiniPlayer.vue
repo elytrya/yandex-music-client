@@ -178,17 +178,44 @@
           <q-tooltip>Текст песни</q-tooltip>
         </button>
 
-        <button
+        <div
           v-else-if="id === 'volume'"
-          type="button"
-          class="mini-btn"
+          class="mini-vol"
           data-no-drag
-          aria-label="Громкость"
-          @click.stop="player.toggleMute()"
+          @mouseenter="onVolEnter"
+          @mouseleave="onVolLeave"
         >
-          <Icon :name="player.muted ? 'volumeOff' : 'volume'" :size="15" />
-          <q-tooltip>Громкость</q-tooltip>
-        </button>
+          <Transition name="mini-vol-pop">
+            <div v-if="volumeOpen" class="mini-vol-pop" data-no-drag>
+              <span class="mini-vol-value">{{ volumePercent }}</span>
+              <div
+                ref="volTrack"
+                class="mini-vol-track"
+                @pointerdown.stop="onVolPointerDown"
+              >
+                <div
+                  class="mini-vol-fill"
+                  :style="{ height: `${volumePercent}%` }"
+                >
+                  <span class="mini-vol-knob" />
+                </div>
+              </div>
+            </div>
+          </Transition>
+
+          <button
+            type="button"
+            class="mini-btn"
+            :class="{ on: volumeOpen }"
+            data-no-drag
+            aria-label="Громкость"
+            @click.stop="onVolClick"
+            @wheel.prevent.stop="onVolWheel"
+          >
+            <Icon :name="volumeIcon" :size="15" />
+            <q-tooltip>Громкость: {{ volumePercent }}%</q-tooltip>
+          </button>
+        </div>
       </template>
     </div>
 
@@ -269,6 +296,84 @@ function seekAt(event: MouseEvent) {
   player.seek(ratio * player.duration);
 }
 
+/* --- Вертикальная громкость --- */
+
+const volumeOpen = ref(false);
+const volTrack = ref<HTMLElement | null>(null);
+let volCloseTimer = 0;
+let volDragging = false;
+
+const volumePercent = computed(() =>
+  Math.round((player.muted ? 0 : player.volume) * 100),
+);
+
+const volumeIcon = computed(() =>
+  player.muted || player.volume <= 0.001 ? "volumeOff" : "volume",
+);
+
+function openVolume() {
+  if (!ui.settings.miniVolumeSlider) return;
+  window.clearTimeout(volCloseTimer);
+  volumeOpen.value = true;
+}
+
+function scheduleVolumeClose(delay = 320) {
+  window.clearTimeout(volCloseTimer);
+  volCloseTimer = window.setTimeout(() => {
+    if (!volDragging) volumeOpen.value = false;
+  }, delay);
+}
+
+function onVolEnter() {
+  openVolume();
+}
+
+function onVolLeave() {
+  scheduleVolumeClose();
+}
+
+function onVolClick() {
+  player.toggleMute();
+}
+
+function applyVolume(value: number) {
+  const next = Math.min(1, Math.max(0, value));
+  player.setVolume(next);
+  if (next > 0 && player.muted) player.toggleMute();
+}
+
+function onVolWheel(event: WheelEvent) {
+  openVolume();
+  applyVolume((player.muted ? 0 : player.volume) - event.deltaY / 2000);
+  scheduleVolumeClose(900);
+}
+
+function volumeFromEvent(event: PointerEvent) {
+  const box = volTrack.value?.getBoundingClientRect();
+  if (!box?.height) return;
+  applyVolume((box.bottom - event.clientY) / box.height);
+}
+
+function onVolPointerMove(event: PointerEvent) {
+  if (!volDragging) return;
+  volumeFromEvent(event);
+}
+
+function onVolPointerUp() {
+  volDragging = false;
+  window.removeEventListener("pointermove", onVolPointerMove);
+  window.removeEventListener("pointerup", onVolPointerUp);
+  scheduleVolumeClose();
+}
+
+function onVolPointerDown(event: PointerEvent) {
+  volDragging = true;
+  openVolume();
+  volumeFromEvent(event);
+  window.addEventListener("pointermove", onVolPointerMove);
+  window.addEventListener("pointerup", onVolPointerUp);
+}
+
 const vizCanvas = ref<HTMLCanvasElement | null>(null);
 useVisualizer(vizCanvas, () => ui.settings.miniVisualizer, { bars: 56 });
 
@@ -286,6 +391,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKey);
+  window.removeEventListener("pointermove", onVolPointerMove);
+  window.removeEventListener("pointerup", onVolPointerUp);
+  window.clearTimeout(volCloseTimer);
   delete document.documentElement.dataset.mini;
 });
 </script>
