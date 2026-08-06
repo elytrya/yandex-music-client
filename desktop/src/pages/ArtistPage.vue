@@ -591,7 +591,7 @@ async function playAlbum(id: string) {
   try {
     const album = await api.album(id);
     if (!album.tracks.length) {
-      Notify.create({ message: "В альбоме нет доступных тре��ов" });
+      Notify.create({ message: "В альбоме нет доступных треков" });
       return;
     }
     await player.playQueue(album.tracks, 0);

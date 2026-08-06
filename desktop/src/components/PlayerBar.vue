@@ -127,7 +127,7 @@
           class="pe-item"
           :class="{ dragging: dragId === id }"
           :draggable="editMode"
-          @dragstart="dragId = id"
+          @dragstart="startDrag(id, $event)"
           @dragend="dragId = null"
           @dragover.prevent
           @drop.prevent.stop="dropInZone('left', index)"
@@ -150,7 +150,7 @@
           class="pe-item"
           :class="{ dragging: dragId === id }"
           :draggable="editMode"
-          @dragstart="dragId = id"
+          @dragstart="startDrag(id, $event)"
           @dragend="dragId = null"
           @dragover.prevent
           @drop.prevent.stop="dropInZone('center', index)"
@@ -191,7 +191,7 @@
         class="pe-item"
         :class="{ dragging: dragId === id }"
         :draggable="editMode"
-        @dragstart="dragId = id"
+        @dragstart="startDrag(id, $event)"
         @dragend="dragId = null"
         @dragover.prevent
         @drop.prevent.stop="dropInZone('right', index)"
@@ -270,6 +270,13 @@ const dragId = ref<PlayerButtonId | null>(null);
 
 function toggleEdit() {
   ui.set("playerEditMode", !ui.settings.playerEditMode);
+}
+
+function startDrag(id: PlayerButtonId, event: DragEvent) {
+  dragId.value = id;
+  // WebView2 требует данные в dataTransfer, иначе drag не стартует.
+  event.dataTransfer?.setData("text/plain", id);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
 }
 
 function dropInZone(zone: PlayerZone, index: number) {

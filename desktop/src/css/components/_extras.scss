@@ -180,34 +180,57 @@
 
 .mini-vol-pop {
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 10px);
   left: 50%;
   z-index: 30;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 8px 6px;
+  gap: 10px;
+  width: 34px;
+  padding: 12px 0 14px;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface-2);
-  box-shadow: var(--shadow-strong, 0 10px 28px rgba(0, 0, 0, 0.45));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(var(--glass-blur, 14px));
   transform: translateX(-50%);
+
+  &::after {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: inherit;
+    content: "";
+    transform: translate(-50%, -55%) rotate(45deg);
+  }
 }
 
 .mini-vol-value {
-  color: var(--fg-dim);
+  color: var(--fg);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  opacity: 0.85;
 }
 
 .mini-vol-track {
   position: relative;
-  width: 6px;
+  width: 4px;
   height: var(--mini-volume-height, 96px);
   border-radius: 999px;
-  background: var(--hover);
+  background: color-mix(in srgb, var(--fg) 16%, transparent);
   cursor: pointer;
+  transition: width 0.12s ease;
+
+  &:hover {
+    width: 6px;
+  }
 }
 
 .mini-vol-fill {
@@ -216,19 +239,28 @@
   left: 0;
   width: 100%;
   border-radius: 999px;
-  background: var(--accent);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--accent) 70%, transparent),
+    var(--accent)
+  );
 }
 
 .mini-vol-knob {
   position: absolute;
   top: 0;
   left: 50%;
-  width: 12px;
-  height: 12px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  background: var(--fg);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);
   transform: translate(-50%, -50%);
+  transition: box-shadow 0.14s ease;
+}
+
+.mini-vol-track:hover .mini-vol-knob {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 38%, transparent);
 }
 
 .mini-vol-pop-enter-active,

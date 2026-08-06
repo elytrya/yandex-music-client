@@ -70,7 +70,7 @@
           }"
           :draggable="true"
           :title="miniLabelOf(id)"
-          @dragstart="dragId = id"
+          @dragstart="onDragStart(id, $event)"
           @dragend="dragId = null"
           @dragover.prevent
           @drop.prevent="dropAt(index)"
@@ -242,6 +242,13 @@ const dragId = ref<MiniButtonId | null>(null);
 
 function isVisible(id: MiniButtonId): boolean {
   return lockedMini.has(id) || !!ui.settings.miniButtons[id];
+}
+
+function onDragStart(id: MiniButtonId, event: DragEvent) {
+  dragId.value = id;
+  // Без dataTransfer WebView2 не запускает drag & drop.
+  event.dataTransfer?.setData("text/plain", id);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
 }
 
 function dropAt(index: number) {

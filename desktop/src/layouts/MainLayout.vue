@@ -427,7 +427,7 @@ const lyricsBox = computed(() => ({
 
 const nav = [
   { to: "/", label: "Главное", icon: "home" },
-  { to: "/wave", label: "Моя во��на", icon: "wave" },
+  { to: "/wave", label: "Моя волна", icon: "wave" },
   { to: "/search", label: "Поиск", icon: "search" },
   { to: "/liked", label: "Мне нравится", icon: "heart" },
   { to: "/playlists", label: "Коллекция", icon: "library" },

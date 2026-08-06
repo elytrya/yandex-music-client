@@ -111,7 +111,7 @@
               :class="{ locked: id === 'play', dragging: dragId === id }"
               :draggable="id !== 'play'"
               :title="labelOf(id)"
-              @dragstart="onDragStart(id)"
+              @dragstart="onDragStart(id, $event)"
               @dragend="onDragEnd"
               @dragover.prevent.stop="dragOverZone = zone.value"
               @drop.prevent.stop="dropInZone(zone.value, index)"
@@ -324,9 +324,15 @@ function zoneItems(zone: PlayerZone): PlayerButtonId[] {
   return ui.playerOrderList().filter((id) => zoneOf.value[id] === zone);
 }
 
-function onDragStart(id: PlayerButtonId) {
-  if (id === "play") return;
+function onDragStart(id: PlayerButtonId, event: DragEvent) {
+  if (id === "play") {
+    event.preventDefault();
+    return;
+  }
   dragId.value = id;
+  // WebView2 не начинает перетаскивание без данных в dataTransfer.
+  event.dataTransfer?.setData("text/plain", id);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
 }
 
 function onDragEnd() {
