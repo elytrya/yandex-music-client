@@ -186,7 +186,12 @@
           @mouseleave="onVolLeave"
         >
           <Transition name="mini-vol-pop">
-            <div v-if="volumeOpen" class="mini-vol-pop" data-no-drag>
+            <div
+              v-if="volumeOpen"
+              class="mini-vol-pop"
+              data-no-drag
+              @wheel.prevent.stop="onVolWheel"
+            >
               <span class="mini-vol-value">{{ volumePercent }}</span>
               <div
                 ref="volTrack"

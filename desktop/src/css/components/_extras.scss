@@ -172,6 +172,7 @@
 /* --- Вертикальная громкость в мини-плеере --- */
 
 .mini-vol {
+  /* Якорь для шкалы: она встаёт ровно над иконкой громкости. */
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -181,20 +182,21 @@
 .mini-vol-pop {
   /* Всегда внутри окна мини-плеера: выезжает влево, а не вверх. */
   position: absolute;
-  top: 50%;
-  right: calc(100% + 6px);
+  bottom: calc(100% + 7px);
+  left: 50%;
   z-index: 30;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  width: 22px;
-  padding: 6px 0 7px;
+  justify-content: center;
+  gap: 6px;
+  width: 26px;
+  padding: 8px 0 10px;
+  transform: translateX(-50%);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 999px;
   background: #141414;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
-  transform: translateY(-50%);
 }
 
 .mini-vol-value {
@@ -209,8 +211,9 @@
 .mini-vol-track {
   position: relative;
   width: 4px;
-  /* Окно мини-плеера всего 152px — шкала обязана оставаться компактной. */
-  height: min(var(--mini-volume-height, 56px), calc(100vh - 96px));
+  /* Фиксированная длина — её реально хватает, чтобы тянуть мышью. */
+  flex: 0 0 auto;
+  height: var(--mini-volume-height, 56px);
   border-radius: 999px;
   background: color-mix(in srgb, var(--fg) 16%, transparent);
   cursor: pointer;
@@ -261,7 +264,7 @@
 .mini-vol-pop-enter-from,
 .mini-vol-pop-leave-to {
   opacity: 0;
-  transform: translate(6px, -50%);
+  transform: translate(-50%, 6px);
 }
 
 .mini-play {
