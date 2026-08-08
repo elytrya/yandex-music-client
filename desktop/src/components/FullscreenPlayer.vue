@@ -123,17 +123,22 @@
           </Transition>
 
           <div class="fs-progress">
-            <span class="t-11 faint">{{ formatDuration(player.progress * 1000) }}</span>
+            <span class="t-11 faint">{{
+              formatDuration(seekValue * 1000)
+            }}</span>
             <q-slider
               dense
               color="red"
-              :model-value="player.progress"
+              :model-value="seekValue"
               :min="0"
               :max="Math.max(player.duration, 1)"
               :step="1"
-              @update:model-value="(v) => player.seek(Number(v ?? 0))"
+              @update:model-value="onSeekInput"
+              @change="onSeekCommit"
             />
-            <span class="t-11 faint">{{ formatDuration(player.duration * 1000) }}</span>
+            <span class="t-11 faint">{{
+              formatDuration(player.duration * 1000)
+            }}</span>
           </div>
         </div>
 
@@ -210,6 +215,19 @@ const native = ref(false);
 const dotsButton = ref<HTMLElement | null>(null);
 
 const coverUrl = computed(() => player.current?.cover_url || "");
+
+const scrubbing = ref<number | null>(null);
+const seekValue = computed(() => scrubbing.value ?? player.progress);
+
+function onSeekInput(value: number | null) {
+  scrubbing.value = Number(value ?? 0);
+}
+
+function onSeekCommit(value: number | null) {
+  const target = Number(value ?? 0);
+  scrubbing.value = null;
+  player.seek(target);
+}
 const liked = computed(() =>
   player.current ? library.liked(player.current.id) : false,
 );
@@ -286,7 +304,6 @@ watch(
   },
 );
 
-/* любой переход по ссылке закрывает полноэкранный режим */
 watch(
   () => route.fullPath,
   () => {

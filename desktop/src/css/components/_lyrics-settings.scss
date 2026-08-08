@@ -1,118 +1,358 @@
 .lyrics-settings {
   position: absolute;
-  top: 64px;
-  right: 22px;
-  z-index: 40;
-  width: 320px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: calc(var(--radius) + 4px);
-  background: rgba(18, 18, 22, 0.92);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  z-index: 8;
+  top: 58px;
+  right: 16px;
+  width: 306px;
+  max-height: min(74vh, 620px);
+  overflow: hidden auto;
+  padding: 4px 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(18, 18, 22, 0.86);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(28px) saturate(1.3);
+  color: #fff;
+  animation: lset-in 0.16s ease;
 }
 
-.lyrics-settings-head {
+@keyframes lset-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.lset-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.95rem;
+  gap: 8px;
+  padding: 10px 10px 8px 12px;
 }
 
-.lyrics-settings-reset {
+.lset-title {
+  font-size: 12.5px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.lset-reset {
+  padding: 4px 8px;
   border: 0;
+  border-radius: 7px;
   background: transparent;
-  color: var(--fg-faint);
-  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  font: inherit;
+  font-size: 11px;
   cursor: pointer;
 
   &:hover {
-    color: var(--fg);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
   }
 }
 
-.lyrics-settings-row {
-  display: grid;
-  grid-template-columns: 104px minmax(0, 1fr) 46px;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.82rem;
-  color: var(--fg-dim);
+.lset-group {
+  padding: 6px 12px 10px;
 
-  code {
-    text-align: right;
-    color: var(--fg);
-    font-variant-numeric: tabular-nums;
+  & + .lset-group {
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
   }
 }
 
-.lyrics-settings-choice {
-  grid-column: 2 / span 2;
+.lset-group-head {
+  margin-bottom: 9px;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 10px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lset-range {
+  display: block;
+  margin-bottom: 11px;
+}
+
+.lset-range-top {
   display: flex;
-  gap: 6px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11.5px;
+}
+
+.lset-range-top b {
+  color: rgba(255, 255, 255, 0.9);
+  font-variant-numeric: tabular-nums;
+  font-weight: 560;
+}
+
+.lset-range input[type="range"] {
+  display: block;
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.lset-range input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.lset-range input[type="range"]::-moz-range-track {
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.lset-range input[type="range"]::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.lset-range input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.lset-label {
+  margin-bottom: 5px;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11.5px;
+}
+
+.lset-seg {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 3px;
+  margin-bottom: 11px;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
 
   button {
-    flex: 1;
-    padding: 6px 8px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
+    padding: 6px 4px;
+    border: 0;
+    border-radius: 7px;
     background: transparent;
-    color: var(--fg-dim);
-    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.58);
+    font: inherit;
+    font-size: 11px;
+    white-space: nowrap;
     cursor: pointer;
+    transition:
+      background 0.14s ease,
+      color 0.14s ease;
+
+    &:hover {
+      color: #fff;
+    }
 
     &.on {
-      background: var(--surface-2);
-      color: var(--fg);
+      background: rgba(255, 255, 255, 0.92);
+      color: #101014;
     }
   }
 }
 
-.lyrics-settings-toggle {
+.lset-switch {
   display: flex;
+  width: 100%;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  gap: 10px;
+  min-height: 32px;
+  padding: 4px 6px 4px 0;
+  border: 0;
   background: transparent;
-  color: var(--fg-dim);
-  font-size: 0.84rem;
+  color: rgba(255, 255, 255, 0.82);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
   cursor: pointer;
 
-  i {
-    width: 30px;
-    height: 17px;
-    border-radius: 999px;
-    background: var(--hover);
+  &:hover {
+    color: #fff;
+  }
+
+  span.lset-track {
     position: relative;
+    width: 28px;
+    height: 16px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
     transition: background 0.16s ease;
 
-    &::after {
-      content: "";
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 13px;
-      height: 13px;
-      border-radius: 50%;
-      background: var(--fg);
-      transition: transform 0.16s ease;
-    }
-  }
-
-  &.on {
-    color: var(--fg);
-
     i {
-      background: var(--accent);
-
-      &::after {
-        transform: translateX(13px);
-      }
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.8);
+      transition: transform 0.16s cubic-bezier(0.22, 0.65, 0.28, 1);
     }
   }
+
+  &.on span.lset-track {
+    background: color-mix(in srgb, var(--accent) 65%, transparent);
+  }
+
+  &.on span.lset-track i {
+    background: #fff;
+    transform: translateX(12px);
+  }
+}
+
+.lset-hint {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.34);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.lset-fonts {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.lset-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.lset-input:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.lset-font-current {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10.5px;
+
+  b {
+    overflow: hidden;
+    color: var(--fg);
+    font-size: 12.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.lset-font-list {
+  display: flex;
+  max-height: 190px;
+  flex-direction: column;
+  padding-right: 2px;
+  gap: 1px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.lset-font {
+  overflow: hidden;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lset-font:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+}
+
+.lset-font.on {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--fg);
+}
+
+.lset-font-load {
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 11.5px;
+}
+
+.lset-font-load:hover {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--fg);
+}
+
+.lset-font-list {
+  max-height: 236px;
+  overflow-y: auto;
+}
+
+.lset-font {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.lset-font-name {
+  min-width: 0;
+  flex: 1;
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+.lset-font-sample {
+  overflow: hidden;
+  max-width: 88px;
+  flex: none;
+  color: var(--fg-faint);
+  font-size: 13px;
+  white-space: nowrap;
 }

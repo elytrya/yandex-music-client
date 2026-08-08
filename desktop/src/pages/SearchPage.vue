@@ -71,6 +71,33 @@
             </div>
           </template>
 
+          <template v-if="genius.ready && genius.people.length">
+            <div class="h2 q-mt-xl q-mb-md">Авторы и продюсеры</div>
+            <div class="row q-col-gutter-md">
+              <div v-for="p in genius.people" :key="p.id" class="col-auto">
+                <div
+                  class="card text-center"
+                  style="width: 132px"
+                  @click="openPerson(p.id)"
+                >
+                  <div class="cover round" style="width: 100%; aspect-ratio: 1">
+                    <img
+                      v-if="p.image"
+                      loading="lazy"
+                      decoding="async"
+                      :src="p.image"
+                    />
+                    <Icon v-else name="person" :size="24" class="faint" />
+                  </div>
+                  <div class="t-13 w-500 ellipsis q-mt-sm">{{ p.name }}</div>
+                  <div class="faint t-11">
+                    {{ p.verified ? "genius · ✓" : "genius" }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
           <template v-if="result.albums.length">
             <div class="h2 q-mt-xl q-mb-md">Альбомы</div>
             <div class="row q-col-gutter-md">
@@ -129,10 +156,12 @@ import { api } from "@/api/client";
 import type { Artist, SearchResult } from "@/api/types";
 import { cachedAvatar, fetchAvatars } from "@/lib/artistAvatar";
 import { usePlayerStore } from "@/stores/player/index";
+import { useGeniusStore } from "@/stores/genius";
 
 const route = useRoute();
 const router = useRouter();
 const player = usePlayerStore();
+const genius = useGeniusStore();
 
 const text = ref("");
 const result = ref<SearchResult | null>(null);
@@ -219,11 +248,16 @@ async function run() {
   const q = text.value.trim();
   if (!q) return;
   loading.value = true;
+  if (genius.ready) void genius.searchPeople(q);
   result.value = await api
     .search(q)
     .catch(() => ({ tracks: [], artists: [], albums: [] }));
   loading.value = false;
   void loadAvatars(result.value?.artists ?? []);
+}
+
+function openPerson(id: number) {
+  void router.push({ name: "genius-artist", params: { id: String(id) } });
 }
 
 watch(

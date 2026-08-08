@@ -24,7 +24,10 @@ function read(key: string): Entry | null {
 
 function write(key: string, data: string) {
   try {
-    localStorage.setItem(PREFIX + key, JSON.stringify({ data, at: Date.now() }));
+    localStorage.setItem(
+      PREFIX + key,
+      JSON.stringify({ data, at: Date.now() }),
+    );
   } catch {
     return;
   }

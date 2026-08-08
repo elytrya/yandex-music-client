@@ -51,6 +51,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/pages/StatsPage.vue"),
       },
       {
+        path: "genius/:id/songs",
+        name: "genius-songs",
+        component: () => import("@/pages/GeniusSongsPage.vue"),
+        props: true,
+      },
+      {
+        path: "genius/:id",
+        name: "genius-artist",
+        component: () => import("@/pages/GeniusArtistPage.vue"),
+        props: true,
+      },
+      {
         path: "playlists/:kind",
         name: "playlist",
         component: () => import("@/pages/PlaylistPage.vue"),

@@ -1,6 +1,8 @@
 mod commands;
 mod files;
+mod genius;
 mod hotkeys;
+mod lrclib;
 mod mini;
 mod oauth;
 mod presence;
@@ -90,6 +92,15 @@ pub fn run() {
             commands::find_local_track,
             commands::remove_local_track,
             commands::downloads_info,
+            genius::genius_check,
+            genius::genius_search,
+            genius::genius_search_people,
+            genius::genius_song,
+            genius::genius_lookup,
+            genius::genius_artist,
+            genius::genius_clear_cache,
+            lrclib::lrclib_lookup,
+            lrclib::lrclib_clear_cache,
             presence::validate_discord_app,
             presence::update_discord_presence,
             presence::clear_discord_presence,
@@ -103,6 +114,7 @@ pub fn run() {
             hotkeys::set_global_hotkeys,
             hotkeys::clear_global_hotkeys,
             mini::enter_mini_player,
+            mini::resize_mini_player,
             mini::exit_mini_player,
             files::export_text_file,
             files::read_text_file,

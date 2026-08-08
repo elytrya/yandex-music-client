@@ -1,8 +1,10 @@
 <template>
   <div
     class="mini-player"
-    :class="{ 'has-viz': ui.settings.miniVisualizer }"
-    @mousedown="startWindowDrag"
+    :class="{ 'has-viz': ui.settings.miniVisualizer, 'mini-preview': preview }"
+    :style="rootStyle"
+    @mousedown="onRootMouseDown"
+    @contextmenu="onContext"
   >
     <canvas
       v-if="ui.settings.miniVisualizer"
@@ -10,7 +12,7 @@
       class="mini-visualizer"
     />
 
-    <div class="mini-top" @dblclick="panels.exitMini()">
+    <div class="mini-top" @dblclick="leaveMini()">
       <div class="cover mini-cover">
         <Transition name="pb-cover">
           <img
@@ -48,11 +50,12 @@
       </div>
 
       <button
+        v-if="!preview"
         type="button"
         class="mini-btn mini-restore"
         data-no-drag
         aria-label="Вернуться в обычный вид"
-        @click.stop="panels.exitMini()"
+        @click.stop="leaveMini()"
       >
         <Icon name="restore" :size="15" />
         <q-tooltip>Обычное окно (Esc)</q-tooltip>
@@ -245,6 +248,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import Icon from "@/components/Icon.vue";
 import AiTag from "@/components/AiTag.vue";
 import ArtistsLine from "@/components/ArtistsLine.vue";
@@ -253,17 +257,42 @@ import { useVisualizer } from "@/composables/useVisualizer";
 import { formatDuration } from "@/lib/format";
 import { ensureAiArtists, isAiArtist } from "@/lib/aiTag";
 import { startWindowDrag } from "@/lib/window";
+import { api } from "@/api/client";
 import { useLibraryStore } from "@/stores/library";
 import { usePanelsStore } from "@/stores/panels";
 import { usePlayerStore } from "@/stores/player/index";
 import { useUiStore } from "@/stores/ui/index";
 
+const props = withDefaults(defineProps<{ preview?: boolean }>(), {
+  preview: false,
+});
+
 const player = usePlayerStore();
 const panels = usePanelsStore();
 const library = useLibraryStore();
 const ui = useUiStore();
+const router = useRouter();
 
 const miniButtons = computed(() => ui.activeMiniButtons());
+
+function onRootMouseDown(event: MouseEvent) {
+  if (props.preview) return;
+  startWindowDrag(event);
+}
+
+async function leaveMini() {
+  if (props.preview) return;
+  await panels.exitMini();
+}
+
+async function onContext(event: MouseEvent) {
+  if (props.preview) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest(".mini-meta")) return;
+  event.preventDefault();
+  await panels.exitMini();
+  await router.push({ path: "/settings", query: { section: "mini" } });
+}
 
 const primaryArtistId = computed(
   () => player.current?.artists?.[0]?.id ?? null,
@@ -301,8 +330,6 @@ function seekAt(event: MouseEvent) {
   );
   player.seek(ratio * player.duration);
 }
-
-/* --- Вертикальная громкость --- */
 
 const volumeOpen = ref(false);
 const volTrack = ref<HTMLElement | null>(null);
@@ -374,11 +401,9 @@ function onVolPointerUp() {
 }
 
 function onVolPointerDown(event: PointerEvent) {
-  // Без preventDefault окно успевает перехватить мышь на себя.
   event.preventDefault();
   volDragging = true;
   openVolume();
-  // Захват указателя: тянется даже если курсор ушёл с дорожки.
   try {
     (event.currentTarget as HTMLElement | null)?.setPointerCapture(
       event.pointerId,
@@ -393,16 +418,29 @@ function onVolPointerDown(event: PointerEvent) {
 const vizCanvas = ref<HTMLCanvasElement | null>(null);
 useVisualizer(vizCanvas, () => ui.settings.miniVisualizer, { bars: 56 });
 
+const rootStyle = computed(() => ({
+  "--mini-h": props.preview ? `${ui.settings.miniHeight}px` : "100vh",
+}));
+
+watch(
+  () => [props.preview, ui.settings.miniVolumeSlider] as const,
+  ([isPreview, sliderOn]) => {
+    if (isPreview) volumeOpen.value = !!sliderOn;
+  },
+  { immediate: true },
+);
+
 function onKey(event: KeyboardEvent) {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    void panels.exitMini();
-  }
+  if (event.key !== "Escape") return;
+  event.preventDefault();
+  void panels.exitMini();
 }
 
 onMounted(() => {
+  if (props.preview) return;
   window.addEventListener("keydown", onKey);
   document.documentElement.dataset.mini = "1";
+  void api.resizeMiniPlayer(ui.settings.miniWidth, ui.settings.miniHeight);
 });
 
 onBeforeUnmount(() => {
@@ -410,6 +448,15 @@ onBeforeUnmount(() => {
   window.removeEventListener("pointermove", onVolPointerMove);
   window.removeEventListener("pointerup", onVolPointerUp);
   window.clearTimeout(volCloseTimer);
-  delete document.documentElement.dataset.mini;
+  if (!props.preview) delete document.documentElement.dataset.mini;
 });
 </script>
+
+<style scoped>
+.mini-player.mini-preview {
+  position: absolute;
+  z-index: 1;
+  border-radius: 14px;
+  pointer-events: none;
+}
+</style>

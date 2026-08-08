@@ -1,6 +1,28 @@
 import { Dark } from "quasar";
-import type { InterfaceSettings } from "./defaults";
+import type { InterfaceSettings, LyricsFont } from "./defaults";
 import { isLightColor, lightThemes, themePalettes } from "./themes";
+
+const lyricsFonts: Record<LyricsFont, string> = {
+  sans: "inherit",
+  serif:
+    '"Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif',
+  mono: 'ui-monospace, "JetBrains Mono", "Cascadia Code", Consolas, monospace',
+  custom: "inherit",
+};
+
+function lyricsFontStack(settings: InterfaceSettings): string {
+  if (settings.lyricsFont !== "custom") {
+    return lyricsFonts[settings.lyricsFont] ?? "inherit";
+  }
+  const raw = (settings.lyricsFontCustom || "").trim();
+  if (!raw) return "inherit";
+  const stack = raw
+    .split(",")
+    .map((part) => part.trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean)
+    .map((part) => (/^[a-zA-Z0-9-]+$/.test(part) ? part : `"${part}"`));
+  return stack.length ? `${stack.join(", ")}, sans-serif` : "inherit";
+}
 
 export function applyInterfaceSettings(settings: InterfaceSettings): void {
   const root = document.documentElement;
@@ -54,6 +76,10 @@ export function applyInterfaceSettings(settings: InterfaceSettings): void {
     "--text-scale": `${settings.textScale / 100}`,
     "--glass-blur": `${settings.glassBlur}px`,
     "--lyrics-size": `${settings.lyricsFontSize}px`,
+    "--lyrics-line-height": `${settings.lyricsLineHeight}`,
+    "--lyrics-weight": `${settings.lyricsWeight}`,
+    "--lyrics-font": lyricsFontStack(settings),
+    "--lyrics-inactive": `${settings.lyricsInactive / 100}`,
     "--lyrics-bg-blur": `${settings.lyricsBackgroundBlur}px`,
     "--lyrics-bg-opacity": `${settings.lyricsBackgroundOpacity / 100}`,
     "--lyrics-line-blur": `${settings.lyricsLineBlur}px`,

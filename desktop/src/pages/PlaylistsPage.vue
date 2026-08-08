@@ -103,6 +103,21 @@
                     <span>Сделать личным</span>
                   </div>
                   <div class="menu-sep" />
+                  <div
+                    class="menu-item"
+                    v-close-popup
+                    @click="library.toggleHidden(pl.kind)"
+                  >
+                    <Icon
+                      :name="library.isHidden(pl.kind) ? 'eye' : 'eyeOff'"
+                      :size="17"
+                    />
+                    <span>{{
+                      library.isHidden(pl.kind)
+                        ? "Вернуть в коллекцию"
+                        : "Скрыть плейлист"
+                    }}</span>
+                  </div>
                   <div class="menu-item" v-close-popup @click="clearTracks(pl)">
                     <Icon name="filter" :size="17" />
                     <span>Очистить треки</span>
@@ -182,6 +197,85 @@
             Плейлистов нет
           </div>
         </div>
+
+        <template v-if="hiddenOrdered.length">
+          <div class="row items-center no-wrap q-mt-xl">
+            <div class="h2 col">Скрытые</div>
+            <button type="button" class="btn" @click="showHidden = !showHidden">
+              {{
+                showHidden ? "Свернуть" : `Показать (${hiddenOrdered.length})`
+              }}
+            </button>
+          </div>
+
+          <div v-if="showHidden" class="row q-col-gutter-md q-mt-sm">
+            <div
+              v-for="pl in hiddenOrdered"
+              :key="`hidden-${pl.kind}`"
+              class="col-auto"
+            >
+              <div class="card playlist-hidden-card" style="width: 168px">
+                <div
+                  class="cover card-cover"
+                  @click="router.push(`/playlists/${pl.kind}`)"
+                >
+                  <img
+                    v-if="pl.cover_url"
+                    :src="pl.cover_url"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <Icon v-else name="queue" :size="26" class="faint" />
+                </div>
+
+                <div class="row items-center no-wrap q-mt-sm">
+                  <div class="t-13 w-500 ellipsis col">{{ pl.title }}</div>
+                  <button
+                    type="button"
+                    class="icon-btn xs"
+                    title="Вернуть в коллекцию"
+                    @click="library.toggleHidden(pl.kind)"
+                  >
+                    <Icon name="eye" :size="15" />
+                  </button>
+                </div>
+                <div class="faint t-11">
+                  {{ plural(pl.track_count, "трек", "трека", "треков") }}
+                </div>
+
+                <q-menu context-menu touch-position class="menu">
+                  <div class="menu-body" style="min-width: 196px">
+                    <div
+                      class="menu-item"
+                      v-close-popup
+                      @click="library.toggleHidden(pl.kind)"
+                    >
+                      <Icon name="eye" :size="17" />
+                      <span>Вернуть в коллекцию</span>
+                    </div>
+                    <div
+                      class="menu-item"
+                      v-close-popup
+                      @click="router.push(`/playlists/${pl.kind}`)"
+                    >
+                      <Icon name="queue" :size="17" />
+                      <span>Открыть плейлист</span>
+                    </div>
+                    <div class="menu-sep" />
+                    <div
+                      class="menu-item danger"
+                      v-close-popup
+                      @click="removePlaylist(pl)"
+                    >
+                      <Icon name="trash" :size="17" />
+                      <span>Удалить плейлист</span>
+                    </div>
+                  </div>
+                </q-menu>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </q-scroll-area>
   </q-page>
@@ -207,13 +301,23 @@ const loading = ref(false);
 
 const likedAlbums = computed(() => library.sortedLikedAlbums);
 
-const ordered = computed(() => {
+const showHidden = ref(false);
+
+const sorted = computed(() => {
   const rank = (kind: number) => {
     const at = library.pinned.indexOf(Number(kind));
     return at === -1 ? library.pinned.length + 1 : at;
   };
   return [...playlists.value].sort((a, b) => rank(a.kind) - rank(b.kind));
 });
+
+const ordered = computed(() =>
+  sorted.value.filter((pl) => !library.isHidden(pl.kind)),
+);
+
+const hiddenOrdered = computed(() =>
+  sorted.value.filter((pl) => library.isHidden(pl.kind)),
+);
 
 function syncFromStore() {
   playlists.value = [...library.playlists];
@@ -302,3 +406,14 @@ onMounted(() => {
   });
 });
 </script>
+
+<style scoped>
+.playlist-hidden-card {
+  opacity: 0.66;
+  transition: opacity 0.15s ease;
+}
+
+.playlist-hidden-card:hover {
+  opacity: 1;
+}
+</style>

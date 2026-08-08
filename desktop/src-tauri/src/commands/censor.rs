@@ -5,8 +5,6 @@ use std::time::Duration;
 use serde::Serialize;
 use serde_json::Value;
 
-// Расцензуренные данные треков из проекта FckCensorData.
-// list.json: { "<trackId>": "<raw url файла с полными данными трека>" }
 const LIST_URL: &str =
     "https://raw.githubusercontent.com/Hazzz895/FckCensorData/main/list.json";
 
@@ -25,13 +23,11 @@ fn build_client() -> reqwest::Client {
         .unwrap_or_else(|_| reqwest::Client::new())
 }
 
-// id -> url с полными (расцензуренными) данными трека
 fn list_cache() -> &'static Mutex<Option<HashMap<String, String>>> {
     static CACHE: OnceLock<Mutex<Option<HashMap<String, String>>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(None))
 }
 
-// id -> уже извлечённое настоящее название
 fn title_cache() -> &'static Mutex<HashMap<String, CensorTrack>> {
     static CACHE: OnceLock<Mutex<HashMap<String, CensorTrack>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
@@ -65,14 +61,12 @@ async fn ensure_list() -> Result<HashMap<String, String>, String> {
     Ok(parsed)
 }
 
-/// Возвращает все id треков, для которых есть расцензуренные данные.
 #[tauri::command]
 pub async fn censor_ids() -> Result<Vec<String>, String> {
     let map = ensure_list().await?;
     Ok(map.into_keys().collect())
 }
 
-// Рекурсивно ищем первый объект, у которого есть строковое поле "title".
 fn find_title_object(value: &Value) -> Option<&Value> {
     match value {
         Value::Object(map) => {
@@ -143,8 +137,6 @@ async fn fetch_track(client: &reqwest::Client, id: &str, url: &str) -> Option<Ce
     Some(track)
 }
 
-/// Для переданных id возвращает настоящие (расцензуренные) названия.
-/// id, которых нет в наборе FckCensorData, просто пропускаются.
 #[tauri::command]
 pub async fn censor_titles(ids: Vec<String>) -> Result<Vec<CensorTrack>, String> {
     let map = ensure_list().await?;

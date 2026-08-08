@@ -6,10 +6,11 @@
   flex-direction: column;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px;
+  padding: var(--mini-pad, 10px) calc(var(--mini-pad, 10px) + 2px);
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--bg);
+  opacity: var(--mini-opacity, 1);
   overflow: hidden;
   user-select: none;
 }
@@ -39,8 +40,8 @@
 
 .mini-cover {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: var(--mini-cover, 38px);
+  height: var(--mini-cover, 38px);
   flex: 0 0 auto;
   border-radius: 10px;
   overflow: hidden;
@@ -169,10 +170,7 @@
   row-gap: 2px;
 }
 
-/* --- Вертикальная громкость в мини-плеере --- */
-
 .mini-vol {
-  /* Якорь для шкалы: она встаёт ровно над иконкой громкости. */
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -180,18 +178,16 @@
 }
 
 .mini-vol-pop {
-  /* Всегда внутри окна мини-плеера: выезжает влево, а не вверх. */
   position: absolute;
   bottom: calc(100% + 6px);
   left: 50%;
   z-index: 30;
   display: flex;
-  max-height: calc(100vh - 96px);
+  max-height: calc(var(--mini-h, 100vh) - 96px);
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 26px;
-  /* Симметричные поля под бегунок сверху и снизу. */
   padding: 7px 0;
   transform: translateX(-50%);
   border: 1px solid rgba(255, 255, 255, 0.09);
@@ -212,10 +208,11 @@
 .mini-vol-track {
   position: relative;
   width: 4px;
-  /* Фиксированная длина — её реально хватает, чтобы тянуть мышью. */
-  /* Длинная насколько позволяет окно, без выхода за паддинги. */
   flex: 0 1 auto;
-  height: min(var(--mini-volume-height, 40px), calc(100vh - 110px));
+  height: min(
+    var(--mini-volume-height, 40px),
+    calc(var(--mini-h, 100vh) - 110px)
+  );
   min-height: 24px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--fg) 16%, transparent);
@@ -223,7 +220,6 @@
   touch-action: none;
   transition: width 0.12s ease;
 
-  /* Невидимая зона захвата: в четыре пикселя мышью не попасть. */
   &::before {
     position: absolute;
     z-index: 1;
@@ -245,7 +241,6 @@
   bottom: 0;
   left: 0;
   width: 100%;
-  /* События всегда достаются дорожке, а не заливке или бегунку. */
   pointer-events: none;
   border-radius: 999px;
   background: linear-gradient(
@@ -916,7 +911,6 @@ html[data-mini] {
   }
 }
 
-/* переходы между страницами */
 .page-enter-active {
   transition:
     opacity 0.2s ease-out,

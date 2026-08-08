@@ -14,8 +14,7 @@ async function flushArtists() {
   try {
     const results = await api.aiCheckArtists(ids);
     for (const r of results) artistAi[r.id] = r.ai;
-  } catch {
-  }
+  } catch {}
 }
 
 export function ensureAiArtists(ids: Array<string | null | undefined>): void {
@@ -48,8 +47,7 @@ async function flushTracks() {
   try {
     const results = await api.aiCheckTracks(ids);
     for (const r of results) trackAi[r.id] = r.ai;
-  } catch {
-  }
+  } catch {}
 }
 
 export function ensureAiTracks(ids: Array<string | null | undefined>): void {

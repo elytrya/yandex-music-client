@@ -110,6 +110,35 @@
         description="Если последние секунды трека почти беззвучные, приложение не ждёт их и сразу включает следующий трек."
         @update:model-value="ui.set('trimSilence', $event)"
       />
+      <div class="setting-row setting-row-column">
+        <div class="setting-copy">
+          <b>Когда очередь закончилась</b
+          ><span>
+            Сыграл последний трек списка - дальше или плейлист идёт по кругу,
+            или включается волна, подобранная по этому же плейлисту.
+          </span>
+        </div>
+        <div class="settings-choice">
+          <button
+            :class="{ on: queueEnd === 'stop' }"
+            @click="setQueueEnd('stop')"
+          >
+            Остановиться
+          </button>
+          <button
+            :class="{ on: queueEnd === 'repeat' }"
+            @click="setQueueEnd('repeat')"
+          >
+            Повтор плейлиста
+          </button>
+          <button
+            :class="{ on: queueEnd === 'wave' }"
+            @click="setQueueEnd('wave')"
+          >
+            Моя волна по плейлисту
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="settings-subgroup">
@@ -142,11 +171,25 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import SettingSlider from "@/components/settings/SettingSlider.vue";
 import SettingToggle from "@/components/settings/SettingToggle.vue";
 import { useUiStore } from "@/stores/ui/index";
 
 const ui = useUiStore();
+
+type QueueEnd = "stop" | "repeat" | "wave";
+
+const queueEnd = computed<QueueEnd>(() => {
+  if (ui.settings.repeatPlaylistAlways) return "repeat";
+  return ui.settings.autoWaveOnQueueEnd ? "wave" : "stop";
+});
+
+function setQueueEnd(mode: QueueEnd) {
+  ui.set("repeatPlaylistAlways", mode === "repeat");
+  ui.set("autoWaveOnQueueEnd", mode === "wave");
+  if (mode === "wave") ui.set("autoWaveSource", "playlist");
+}
 </script>
 
 <style scoped>

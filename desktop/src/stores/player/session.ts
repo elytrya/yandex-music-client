@@ -13,6 +13,7 @@ export interface PlayerSession {
   isWave: boolean;
   stationId: string | null;
   stationName: string | null;
+  waveBatchId: string | null;
   savedAt: number;
 }
 
@@ -47,6 +48,7 @@ export function loadSession(): PlayerSession | null {
       isWave: Boolean(data.isWave),
       stationId: data.stationId ?? null,
       stationName: data.stationName ?? null,
+      waveBatchId: data.waveBatchId ?? null,
       savedAt: typeof data.savedAt === "number" ? data.savedAt : 0,
     };
   } catch {

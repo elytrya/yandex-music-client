@@ -2,60 +2,68 @@
   <q-page class="wave-page">
     <div class="wave-scroll">
       <div class="wave-content">
-        <header class="wave-top">
-          <div class="wave-top-info">
-            <span class="wave-top-eyebrow">{{ stationTitle }}</span>
+        <header class="wave-hero">
+          <div class="wave-hero-art">
+            <img
+              v-if="coverUrl"
+              :src="coverUrl"
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+            <Icon v-else name="wave" :size="26" class="faint" />
+            <TrackMenu
+              v-if="player.current"
+              :context-menu="true"
+              :track="player.current"
+            />
+          </div>
+
+          <div class="wave-hero-body">
+            <span class="wave-hero-eyebrow">{{ stationTitle }}</span>
             <h1>{{ hasCurrent ? currentTitle : "Моя волна" }}</h1>
-            <p v-if="hasCurrent" class="wave-top-artists">
+            <p v-if="hasCurrent" class="wave-hero-sub">
               <ArtistsLine
                 :artists="player.current?.artists ?? []"
                 :limit="3"
               />
             </p>
-            <p v-else>{{ heroSubtitle }}</p>
-          </div>
-          <TrackMenu
-            v-if="player.current"
-            :context-menu="true"
-            :track="player.current"
-          />
-          <div class="wave-top-controls">
-            <button
-              v-if="hasCurrent"
-              type="button"
-              class="wave-ic"
-              title="Не нравится"
-              @click="player.dislike()"
-            >
-              <Icon name="heartOff" :size="17" />
-            </button>
-            <button
-              type="button"
-              class="wave-ic wave-ic-play"
-              :title="primaryLabel"
-              @click="onPrimary"
-            >
-              <q-spinner v-if="player.loading" size="16px" />
-              <Icon v-else :name="primaryIcon" :size="18" />
-            </button>
-            <button
-              v-if="hasCurrent"
-              type="button"
-              class="wave-ic"
-              title="Нравится"
-              @click="player.like()"
-            >
-              <Icon name="heart" :size="17" />
-            </button>
-            <button
-              v-if="hasCurrent"
-              type="button"
-              class="wave-ic"
-              title="Следующий"
-              @click="player.next(false)"
-            >
-              <Icon name="next" :size="17" />
-            </button>
+            <p v-else class="wave-hero-sub">{{ heroSubtitle }}</p>
+
+            <div class="wave-hero-row">
+              <button type="button" class="wave-play" @click="onPrimary">
+                <q-spinner v-if="player.loading" size="15px" />
+                <Icon v-else :name="primaryIcon" :size="16" />
+                <span>{{ primaryLabel }}</span>
+              </button>
+
+              <template v-if="hasCurrent">
+                <button
+                  type="button"
+                  class="wave-ic"
+                  title="Нравится"
+                  @click="player.like()"
+                >
+                  <Icon name="heart" :size="16" />
+                </button>
+                <button
+                  type="button"
+                  class="wave-ic"
+                  title="Не нравится"
+                  @click="player.dislike()"
+                >
+                  <Icon name="heartOff" :size="16" />
+                </button>
+                <button
+                  type="button"
+                  class="wave-ic"
+                  title="Следующий"
+                  @click="player.next(false)"
+                >
+                  <Icon name="next" :size="16" />
+                </button>
+              </template>
+            </div>
           </div>
         </header>
 
@@ -64,18 +72,51 @@
           <button type="button" @click="refresh">Обновить</button>
         </p>
 
-        <nav class="wave-chips">
+        <div class="wave-stations">
           <button
-            v-for="item in stations"
-            :key="item.id"
+            v-show="canScrollLeft"
             type="button"
-            class="wave-chip"
-            :class="{ on: isActiveStation(item) }"
-            @click="playStation(item)"
+            class="wave-stations-arrow left"
+            aria-label="Прокрутить влево"
+            @click="scrollStations(-1)"
           >
-            {{ item.name }}
+            <Icon name="chevronLeft" :size="15" />
           </button>
-        </nav>
+
+          <nav
+            ref="chipsEl"
+            class="wave-chips"
+            :class="{
+              dragging,
+              'edge-left': canScrollLeft,
+              'edge-right': canScrollRight,
+            }"
+            @pointerdown="onDragStart"
+            @wheel="onChipsWheel"
+            @scroll="updateEdges"
+          >
+            <button
+              v-for="item in stations"
+              :key="item.id"
+              type="button"
+              class="wave-chip"
+              :class="{ on: isActiveStation(item) }"
+              @click="onChipClick(item)"
+            >
+              {{ item.name }}
+            </button>
+          </nav>
+
+          <button
+            v-show="canScrollRight"
+            type="button"
+            class="wave-stations-arrow right"
+            aria-label="Прокрутить вправо"
+            @click="scrollStations(1)"
+          >
+            <Icon name="chevronRight" :size="15" />
+          </button>
+        </div>
 
         <section v-if="settingsGroups.length" class="wave-settings">
           <div
@@ -146,7 +187,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { api } from "@/api/client";
 import { Notify } from "quasar";
 import type { StationInfo, Track, WheelItem } from "@/api/types";
@@ -260,6 +308,7 @@ const stationTitle = computed(() => player.stationName || "Моя волна");
 const errorText = computed(() => player.waveError || loadError.value);
 
 const currentTitle = computed(() => player.current?.title ?? "");
+const coverUrl = computed(() => player.current?.cover_url ?? null);
 
 const heroSubtitle = computed(() =>
   hasCurrent.value
@@ -307,6 +356,119 @@ function playStation(item: WheelItem) {
   void player.startWave(stationIdOf(item), item.name);
 }
 
+const chipsEl = ref<HTMLElement | null>(null);
+const dragging = ref(false);
+const canScrollLeft = ref(false);
+const canScrollRight = ref(false);
+
+let activePointer: number | null = null;
+let startX = 0;
+let startScroll = 0;
+let travelled = 0;
+let lastX = 0;
+let lastAt = 0;
+let velocity = 0;
+let glideFrame = 0;
+
+function updateEdges() {
+  const el = chipsEl.value;
+  if (!el) return;
+  const max = el.scrollWidth - el.clientWidth;
+  canScrollLeft.value = el.scrollLeft > 4;
+  canScrollRight.value = max > 4 && el.scrollLeft < max - 4;
+}
+
+function stopGlide() {
+  if (glideFrame) cancelAnimationFrame(glideFrame);
+  glideFrame = 0;
+}
+
+function glide() {
+  const el = chipsEl.value;
+  if (!el) return stopGlide();
+  velocity *= 0.93;
+  if (Math.abs(velocity) < 0.2) return stopGlide();
+  el.scrollLeft -= velocity;
+  updateEdges();
+  glideFrame = requestAnimationFrame(glide);
+}
+
+function onDragMove(event: PointerEvent) {
+  const el = chipsEl.value;
+  if (!el || event.pointerId !== activePointer) return;
+  const shift = event.clientX - startX;
+  if (!dragging.value && Math.abs(shift) > 4) dragging.value = true;
+  if (!dragging.value) return;
+  travelled = Math.abs(shift);
+  el.scrollLeft = startScroll - shift;
+  const elapsed = event.timeStamp - lastAt;
+  if (elapsed > 0) velocity = ((event.clientX - lastX) / elapsed) * 16;
+  lastX = event.clientX;
+  lastAt = event.timeStamp;
+  updateEdges();
+}
+
+function onDragEnd(event: PointerEvent) {
+  if (activePointer !== null && event.pointerId !== activePointer) return;
+  window.removeEventListener("pointermove", onDragMove);
+  window.removeEventListener("pointerup", onDragEnd);
+  window.removeEventListener("pointercancel", onDragEnd);
+  activePointer = null;
+  if (dragging.value && Math.abs(velocity) > 0.6) glide();
+  window.setTimeout(() => {
+    dragging.value = false;
+    travelled = 0;
+  }, 0);
+  updateEdges();
+}
+
+function onDragStart(event: PointerEvent) {
+  const el = chipsEl.value;
+  if (!el || event.button !== 0) return;
+  if (el.scrollWidth <= el.clientWidth) return;
+  stopGlide();
+  activePointer = event.pointerId;
+  startX = event.clientX;
+  lastX = event.clientX;
+  lastAt = event.timeStamp;
+  startScroll = el.scrollLeft;
+  travelled = 0;
+  velocity = 0;
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", onDragEnd);
+  window.addEventListener("pointercancel", onDragEnd);
+}
+
+function onChipClick(item: WheelItem) {
+  if (travelled > 6) return;
+  playStation(item);
+}
+
+function onChipsWheel(event: WheelEvent) {
+  const el = chipsEl.value;
+  if (!el || el.scrollWidth <= el.clientWidth) return;
+  const shift =
+    Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      ? event.deltaX
+      : event.deltaY;
+  if (!shift) return;
+  event.preventDefault();
+  stopGlide();
+  el.scrollLeft += shift;
+  updateEdges();
+}
+
+function scrollStations(direction: number) {
+  const el = chipsEl.value;
+  if (!el) return;
+  stopGlide();
+  el.scrollBy({
+    left: direction * Math.max(180, el.clientWidth * 0.8),
+    behavior: "smooth",
+  });
+  window.setTimeout(updateEdges, 340);
+}
+
 function jumpTo(index: number) {
   const queue = player.queue ?? [];
   if (index < 0 || index >= queue.length) return;
@@ -335,8 +497,34 @@ function refresh() {
   void load();
 }
 
+let chipsResize: ResizeObserver | null = null;
+
+watch(stations, () => {
+  void nextTick(updateEdges);
+});
+
 onMounted(() => {
   void loadInfo();
   void load();
+
+  void nextTick(() => {
+    updateEdges();
+    const el = chipsEl.value;
+    if (el && typeof ResizeObserver !== "undefined") {
+      chipsResize = new ResizeObserver(updateEdges);
+      chipsResize.observe(el);
+    }
+  });
+  window.addEventListener("resize", updateEdges);
+});
+
+onBeforeUnmount(() => {
+  stopGlide();
+  chipsResize?.disconnect();
+  chipsResize = null;
+  window.removeEventListener("resize", updateEdges);
+  window.removeEventListener("pointermove", onDragMove);
+  window.removeEventListener("pointerup", onDragEnd);
+  window.removeEventListener("pointercancel", onDragEnd);
 });
 </script>

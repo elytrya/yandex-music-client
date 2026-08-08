@@ -1,22 +1,38 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
+use std::time::Instant;
 
 use tauri::http::{Request, Response};
 use tauri::UriSchemeResponder;
 
 pub const SCHEME: &str = "ymstream";
 
-const CACHE_LIMIT: usize = 3;
+const FIRST_CHUNK: usize = 256 * 1024;
+const CHUNK: usize = 1024 * 1024;
+const CHUNK_LIMIT: usize = 48;
+const WARM_BYTES: usize = 1536 * 1024;
+const META_TTL_SECS: u64 = 600;
 
-struct Cached {
+struct Chunk {
     url: String,
+    start: usize,
     body: Vec<u8>,
-    mime: String,
 }
 
-fn cache() -> &'static Mutex<Vec<Cached>> {
-    static CACHE: OnceLock<Mutex<Vec<Cached>>> = OnceLock::new();
-    CACHE.get_or_init(|| Mutex::new(Vec::new()))
+struct Meta {
+    total: usize,
+    mime: String,
+    at: Instant,
+}
+
+fn chunks() -> &'static Mutex<Vec<Chunk>> {
+    static CHUNKS: OnceLock<Mutex<Vec<Chunk>>> = OnceLock::new();
+    CHUNKS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn metas() -> &'static Mutex<HashMap<String, Meta>> {
+    static METAS: OnceLock<Mutex<HashMap<String, Meta>>> = OnceLock::new();
+    METAS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn inflight() -> &'static Mutex<HashSet<String>> {
@@ -24,28 +40,69 @@ fn inflight() -> &'static Mutex<HashSet<String>> {
     INFLIGHT.get_or_init(|| Mutex::new(HashSet::new()))
 }
 
-fn cached(url: &str) -> Option<(Vec<u8>, String)> {
-    let store = cache().lock().ok()?;
-    store
-        .iter()
-        .find(|item| item.url == url)
-        .map(|item| (item.body.clone(), item.mime.clone()))
+fn http() -> Option<reqwest::Client> {
+    static CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::Client::builder()
+                .user_agent("Yandex-Music-API")
+                .build()
+                .ok()
+        })
+        .clone()
 }
 
-fn remember(url: &str, body: &[u8], mime: &str) {
+fn cached_chunk(url: &str, start: usize) -> Option<Vec<u8>> {
+    let mut store = chunks().lock().ok()?;
+    let at = store
+        .iter()
+        .position(|item| item.start == start && item.url == url)?;
+    let item = store.remove(at);
+    let body = item.body.clone();
+    store.push(item);
+    Some(body)
+}
+
+fn remember_chunk(url: &str, start: usize, body: &[u8]) {
     if body.is_empty() {
         return;
     }
-    if let Ok(mut store) = cache().lock() {
-        store.retain(|item| item.url != url);
-        store.push(Cached {
+    if let Ok(mut store) = chunks().lock() {
+        store.retain(|item| !(item.start == start && item.url == url));
+        store.push(Chunk {
             url: url.to_string(),
+            start,
             body: body.to_vec(),
-            mime: mime.to_string(),
         });
-        while store.len() > CACHE_LIMIT {
+        while store.len() > CHUNK_LIMIT {
             store.remove(0);
         }
+    }
+}
+
+fn cached_meta(url: &str) -> Option<(usize, String)> {
+    let mut store = metas().lock().ok()?;
+    let fresh = match store.get(url) {
+        Some(meta) => meta.at.elapsed().as_secs() < META_TTL_SECS,
+        None => return None,
+    };
+    if !fresh {
+        store.remove(url);
+        return None;
+    }
+    store.get(url).map(|meta| (meta.total, meta.mime.clone()))
+}
+
+fn remember_meta(url: &str, total: usize, mime: &str) {
+    if let Ok(mut store) = metas().lock() {
+        store.insert(
+            url.to_string(),
+            Meta {
+                total,
+                mime: mime.to_string(),
+                at: Instant::now(),
+            },
+        );
     }
 }
 
@@ -87,6 +144,13 @@ fn mime_for(url: &str) -> &'static str {
     }
 }
 
+fn pick_mime(upstream: &str, target: &str) -> String {
+    if upstream.starts_with("audio/") {
+        return upstream.to_string();
+    }
+    mime_for(target).to_string()
+}
+
 fn empty(status: u16) -> Response<Vec<u8>> {
     Response::builder()
         .status(status)
@@ -95,33 +159,151 @@ fn empty(status: u16) -> Response<Vec<u8>> {
         .expect("empty response")
 }
 
-fn parse_range(value: &str, total: usize) -> Option<(usize, usize)> {
+fn unsatisfiable(total: usize) -> Response<Vec<u8>> {
+    Response::builder()
+        .status(416)
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Content-Range", format!("bytes */{total}"))
+        .body(Vec::new())
+        .unwrap_or_else(|_| empty(416))
+}
+
+fn parse_range(value: &str, total: usize) -> Option<(usize, Option<usize>)> {
     let raw = value.trim().strip_prefix("bytes=")?;
     let (from, to) = raw.split_once('-')?;
+    let from = from.trim();
+    let to = to.trim();
+    if total == 0 {
+        return None;
+    }
     if from.is_empty() {
         let suffix: usize = to.parse().ok()?;
+        if suffix == 0 {
+            return None;
+        }
         let start = total.saturating_sub(suffix);
-        return Some((start, total.saturating_sub(1)));
+        return Some((start, Some(total - 1)));
     }
     let start: usize = from.parse().ok()?;
     if start >= total {
         return None;
     }
     let end = if to.is_empty() {
-        total.saturating_sub(1)
+        None
     } else {
-        to.parse().unwrap_or(total.saturating_sub(1))
+        to.parse::<usize>().ok().map(|end| end.min(total - 1))
     };
-    Some((start, end.min(total.saturating_sub(1))))
+    Some((start, end))
 }
 
-fn from_cache(body: Vec<u8>, mime: String, range: Option<String>) -> Response<Vec<u8>> {
+fn chunk_span(start: usize) -> usize {
+    if start == 0 {
+        FIRST_CHUNK
+    } else {
+        CHUNK
+    }
+}
+
+async fn fetch_range(target: &str, start: usize, end: usize) -> Option<Vec<u8>> {
+    let response = http()?
+        .get(target)
+        .header("Range", format!("bytes={start}-{end}"))
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    Some(response.bytes().await.ok()?.to_vec())
+}
+
+async fn ensure_chunk(target: &str, start: usize, end: usize) -> Option<Vec<u8>> {
+    if let Some(body) = cached_chunk(target, start) {
+        return Some(body);
+    }
+    let body = fetch_range(target, start, end).await?;
+    remember_chunk(target, start, &body);
+    Some(body)
+}
+
+async fn meta(target: &str) -> Option<(usize, String)> {
+    if let Some(found) = cached_meta(target) {
+        return Some(found);
+    }
+    let response = http()?
+        .get(target)
+        .header("Range", "bytes=0-0")
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let upstream = response
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let total = response
+        .headers()
+        .get("content-range")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.rsplit('/').next().map(|part| part.to_string()))
+        .and_then(|part| part.trim().parse::<usize>().ok())?;
+    if total == 0 {
+        return None;
+    }
+    let mime = pick_mime(&upstream, target);
+    remember_meta(target, total, &mime);
+    Some((total, mime))
+}
+
+async fn readahead(target: String, start: usize) {
+    let key = format!("{target}#{start}");
+    if cached_chunk(&target, start).is_some() {
+        return;
+    }
+    if let Ok(mut set) = inflight().lock() {
+        if !set.insert(key.clone()) {
+            return;
+        }
+    }
+    if let Some((total, _)) = meta(&target).await {
+        if start < total {
+            let end = (start + chunk_span(start)).min(total) - 1;
+            let _ = ensure_chunk(&target, start, end).await;
+        }
+    }
+    if let Ok(mut set) = inflight().lock() {
+        set.remove(&key);
+    }
+}
+
+async fn download_all(target: &str) -> Option<(Vec<u8>, String)> {
+    let response = http()?.get(target).send().await.ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let upstream = response
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let body = response.bytes().await.ok()?.to_vec();
+    let mime = pick_mime(&upstream, target);
+    Some((body, mime))
+}
+
+fn whole(body: Vec<u8>, mime: String, range: Option<String>) -> Response<Vec<u8>> {
     let total = body.len();
     let mut builder = Response::builder()
         .header("Access-Control-Allow-Origin", "*")
         .header("Accept-Ranges", "bytes")
         .header("Content-Type", mime);
     if let Some((start, end)) = range.as_deref().and_then(|value| parse_range(value, total)) {
+        let end = end.unwrap_or(total.saturating_sub(1));
         let slice = body[start..=end].to_vec();
         builder = builder
             .status(206)
@@ -135,113 +317,15 @@ fn from_cache(body: Vec<u8>, mime: String, range: Option<String>) -> Response<Ve
     builder.body(body).unwrap_or_else(|_| empty(500))
 }
 
-async fn download(target: &str) -> Option<(Vec<u8>, String)> {
-    let client = reqwest::Client::builder()
-        .user_agent("Yandex-Music-API")
-        .build()
-        .ok()?;
-    let response = client.get(target).send().await.ok()?;
-    if !response.status().is_success() {
-        return None;
-    }
-    let upstream = response
-        .headers()
-        .get("content-type")
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    let body = response.bytes().await.ok()?.to_vec();
-    let mime = if upstream.starts_with("audio/") {
-        upstream
-    } else {
-        mime_for(target).to_string()
-    };
-    Some((body, mime))
-}
-
-const CHUNKS: usize = 4;
-const MIN_CHUNKED: usize = 2 * 1024 * 1024;
-
-fn http() -> Option<reqwest::Client> {
-    reqwest::Client::builder()
-        .user_agent("Yandex-Music-API")
-        .build()
-        .ok()
-}
-
-async fn probe(target: &str) -> Option<(usize, String)> {
-    let response = http()?
-        .get(target)
-        .header("Range", "bytes=0-0")
-        .send()
-        .await
-        .ok()?;
-    let mime = response
-        .headers()
-        .get("content-type")
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    let total = response
-        .headers()
-        .get("content-range")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.rsplit('/').next().map(|part| part.to_string()))
-        .and_then(|part| part.trim().parse::<usize>().ok())?;
-    Some((total, mime))
-}
-
-async fn fetch_range(target: String, start: usize, end: usize) -> Option<Vec<u8>> {
-    let response = http()?
-        .get(&target)
-        .header("Range", format!("bytes={}-{}", start, end))
-        .send()
-        .await
-        .ok()?;
-    if !response.status().is_success() {
-        return None;
-    }
-    Some(response.bytes().await.ok()?.to_vec())
-}
-
-async fn download_chunked(target: &str) -> Option<(Vec<u8>, String)> {
-    let Some((total, upstream)) = probe(target).await else {
-        return download(target).await;
-    };
-    if total < MIN_CHUNKED {
-        return download(target).await;
-    }
-    let span = (total + CHUNKS - 1) / CHUNKS;
-    let mut tasks = Vec::new();
-    for index in 0..CHUNKS {
-        let start = index * span;
-        if start >= total {
-            break;
-        }
-        let end = (start + span).min(total) - 1;
-        let url = target.to_string();
-        tasks.push(tauri::async_runtime::spawn(async move {
-            fetch_range(url, start, end).await
-        }));
-    }
-    let mut body: Vec<u8> = Vec::with_capacity(total);
-    for task in tasks {
-        let part = task.await.ok()??;
-        body.extend_from_slice(&part);
-    }
-    if body.len() != total {
-        return download(target).await;
-    }
-    let mime = if upstream.starts_with("audio/") {
-        upstream
-    } else {
-        mime_for(target).to_string()
-    };
-    Some((body, mime))
-}
 pub fn clear() {
-    if let Ok(mut store) = cache().lock() {
+    if let Ok(mut store) = chunks().lock() {
         store.clear();
+    }
+    if let Ok(mut store) = metas().lock() {
+        store.clear();
+    }
+    if let Ok(mut set) = inflight().lock() {
+        set.clear();
     }
 }
 
@@ -249,92 +333,84 @@ pub async fn warm(target: String) {
     if !target.starts_with("https://") && !target.starts_with("http://") {
         return;
     }
-    if cached(&target).is_some() {
+    let Some((total, _)) = meta(&target).await else {
         return;
-    }
-    if let Ok(mut set) = inflight().lock() {
-        if !set.insert(target.clone()) {
-            return;
+    };
+    let started = Instant::now();
+    let mut start = 0usize;
+    let mut loaded = 0usize;
+    while start < total && loaded < WARM_BYTES {
+        let end = (start + chunk_span(start)).min(total) - 1;
+        if ensure_chunk(&target, start, end).await.is_none() {
+            break;
         }
+        loaded += end - start + 1;
+        start = end + 1;
     }
-    let started = std::time::Instant::now();
-    if let Some((body, mime)) = download_chunked(&target).await {
-        let size = body.len();
-        remember(&target, &body, &mime);
-        println!(
-            "[cache] предзагружено {} КБ за {} мс, {} КБ/с ({mime})",
-            size / 1024,
-            started.elapsed().as_millis(),
-            size as u128 / 1024 / started.elapsed().as_millis().max(1) * 1000
-        );
-    }
-    if let Ok(mut set) = inflight().lock() {
-        set.remove(&target);
-    }
+    println!(
+        "[cache] прогрето {} КБ из {} КБ за {} мс",
+        loaded / 1024,
+        total / 1024,
+        started.elapsed().as_millis()
+    );
 }
+
 async fn fetch(target: String, range: Option<String>) -> Response<Vec<u8>> {
     if !target.starts_with("https://") && !target.starts_with("http://") {
         return empty(400);
     }
 
-    if let Some((body, mime)) = cached(&target) {
-        println!("[cache] из памяти: {} КБ", body.len() / 1024);
-        return from_cache(body, mime, range);
-    }
-
-    {
-        let warming = target.clone();
-        tauri::async_runtime::spawn(async move { warm(warming).await });
-    }
-
-    let client = match reqwest::Client::builder()
-        .user_agent("Yandex-Music-API")
-        .build()
-    {
-        Ok(client) => client,
-        Err(_) => return empty(500),
+    let Some((total, mime)) = meta(&target).await else {
+        return match download_all(&target).await {
+            Some((body, mime)) => whole(body, mime, range),
+            None => empty(502),
+        };
     };
 
-    let mut request = client.get(&target);
-    if let Some(value) = range.as_deref() {
-        request = request.header("Range", value);
+    let (start, limit) = match range.as_deref() {
+        Some(value) => match parse_range(value, total) {
+            Some(parsed) => parsed,
+            None => return unsatisfiable(total),
+        },
+        None => (0usize, None),
+    };
+
+    let mut end = (start + chunk_span(start)).min(total) - 1;
+    if let Some(explicit) = limit {
+        end = end.min(explicit);
+    }
+    if end < start {
+        end = start;
     }
 
-    let response = match request.send().await {
-        Ok(response) => response,
-        Err(_) => return empty(502),
+    let Some(body) = ensure_chunk(&target, start, end).await else {
+        return empty(502);
     };
+    if body.is_empty() {
+        return empty(502);
+    }
+    let served_end = start + body.len() - 1;
 
-    let status = response.status().as_u16();
-    let headers = response.headers().clone();
-    let body = match response.bytes().await {
-        Ok(bytes) => bytes.to_vec(),
-        Err(_) => return empty(502),
-    };
+    if served_end + 1 < total {
+        let ahead = target.clone();
+        let next = served_end + 1;
+        tauri::async_runtime::spawn(async move {
+            readahead(ahead, next).await;
+        });
+    }
 
-    let mut builder = Response::builder()
-        .status(status)
+    Response::builder()
+        .status(206)
         .header("Access-Control-Allow-Origin", "*")
-        .header("Accept-Ranges", "bytes");
-
-    let upstream_type = headers
-        .get("content-type")
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("");
-    let content_type = if upstream_type.starts_with("audio/") {
-        upstream_type.to_string()
-    } else {
-        mime_for(&target).to_string()
-    };
-    builder = builder.header("Content-Type", content_type);
-
-    for name in ["content-length", "content-range"] {
-        if let Some(value) = headers.get(name).and_then(|value| value.to_str().ok()) {
-            builder = builder.header(name, value);
-        }
-    }
-
-    builder.body(body).unwrap_or_else(|_| empty(500))
+        .header("Accept-Ranges", "bytes")
+        .header("Content-Type", mime)
+        .header("Content-Length", body.len().to_string())
+        .header(
+            "Content-Range",
+            format!("bytes {}-{}/{}", start, served_end, total),
+        )
+        .body(body)
+        .unwrap_or_else(|_| empty(500))
 }
 
 pub fn handle(request: Request<Vec<u8>>, responder: UriSchemeResponder) {

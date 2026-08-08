@@ -31,7 +31,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { Notify } from "quasar";
 import { askConfirm } from "@/lib/dialogs";
 import Icon from "@/components/Icon.vue";
@@ -42,6 +43,7 @@ import CacheSection from "@/components/settings/sections/CacheSection.vue";
 import DiscordSection from "@/components/settings/sections/DiscordSection.vue";
 import DownloadsSection from "@/components/settings/sections/DownloadsSection.vue";
 import EqualizerSection from "@/components/settings/sections/EqualizerSection.vue";
+import GeniusSection from "@/components/settings/sections/GeniusSection.vue";
 import HotkeysSection from "@/components/settings/sections/HotkeysSection.vue";
 import LayoutSection from "@/components/settings/sections/LayoutSection.vue";
 import LyricsSection from "@/components/settings/sections/LyricsSection.vue";
@@ -103,6 +105,12 @@ const sections = [
     component: LyricsSection,
   },
   {
+    id: "genius",
+    label: "Genius",
+    icon: "note",
+    component: GeniusSection,
+  },
+  {
     id: "equalizer",
     label: "Эквалайзер",
     icon: "wave",
@@ -124,7 +132,24 @@ const sections = [
   { id: "about", label: "О проекте", icon: "info", component: AboutSection },
 ];
 
-const active = ref(sections[0]!.id);
+const route = useRoute();
+
+function sectionFromQuery(): string | null {
+  const raw = route.query.section;
+  const id = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof id !== "string") return null;
+  return sections.some((s) => s.id === id) ? id : null;
+}
+
+const active = ref(sectionFromQuery() ?? sections[0]!.id);
+
+watch(
+  () => route.query.section,
+  () => {
+    const id = sectionFromQuery();
+    if (id && id !== active.value) select(id);
+  },
+);
 
 const activeComponent = computed(
   () => sections.find((s) => s.id === active.value)?.component ?? null,

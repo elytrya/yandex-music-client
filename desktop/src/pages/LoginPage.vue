@@ -205,8 +205,7 @@ async function cancelAuto(): Promise<void> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("oauth_cancel");
-  } catch {
-  }
+  } catch {}
 }
 
 async function submitManual(): Promise<void> {
@@ -220,8 +219,7 @@ async function copyCode(): Promise<void> {
     await navigator.clipboard.writeText(userCode.value);
     copied.value = true;
     window.setTimeout(() => (copied.value = false), 1500);
-  } catch {
-  }
+  } catch {}
 }
 
 onBeforeUnmount(() => {

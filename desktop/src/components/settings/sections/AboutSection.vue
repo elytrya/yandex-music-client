@@ -9,12 +9,12 @@
       <img class="about-avatar" :src="avatar" alt="elytrya" />
       <div class="about-ident">
         <div class="about-name">Mashiro</div>
-        <div class="about-sub">
-          неофициальный десктоп-клиент Яндекс Музыки
-        </div>
+        <div class="about-sub">неофициальный десктоп-клиент Яндекс Музыки</div>
         <div class="about-links">
           автор:
-          <a :href="AUTHOR_URL" @click.prevent="openLink(AUTHOR_URL)">elytrya</a>
+          <a :href="AUTHOR_URL" @click.prevent="openLink(AUTHOR_URL)"
+            >elytrya</a
+          >
         </div>
       </div>
     </div>
@@ -27,7 +27,9 @@
       <div class="about-row">
         <span class="about-key">Лицензия</span>
         <span class="about-val">
-          <a :href="LICENSE_URL" @click.prevent="openLink(LICENSE_URL)">GPL-3.0</a>
+          <a :href="LICENSE_URL" @click.prevent="openLink(LICENSE_URL)"
+            >GPL-3.0</a
+          >
         </span>
       </div>
       <div class="about-row">

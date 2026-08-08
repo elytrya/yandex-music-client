@@ -14,6 +14,14 @@ import type { ThemeName } from "./themes";
 
 export type Density = "compact" | "comfortable" | "spacious";
 export type CoverStyle = "square" | "soft" | "rounded";
+export type AutoWaveSource = "playlist" | "personal";
+
+export type LyricsSource = "auto" | "lrclib" | "genius" | "yandex";
+
+export type LyricsFont = "sans" | "serif" | "mono" | "custom";
+export type LyricsAlign = "left" | "center" | "right";
+export type LyricsBackdrop = "cover" | "gradient" | "solid";
+export type LyricsHighlight = "white" | "accent" | "karaoke";
 
 export const DEFAULT_DISCORD_CLIENT_ID = "1532382113821753354";
 
@@ -61,14 +69,25 @@ export interface InterfaceSettings {
   miniPadding: number;
   miniVolumeSlider: boolean;
   miniVolumeHeight: number;
+  miniWidth: number;
+  miniHeight: number;
   playerVisualizer: boolean;
   lyricsFontSize: number;
+  lyricsLineHeight: number;
+  lyricsWeight: number;
+  lyricsFont: LyricsFont;
+  lyricsFontCustom: string;
   lyricsBackgroundBlur: number;
   lyricsBackgroundOpacity: number;
   lyricsLineBlur: number;
-  lyricsAlign: "left" | "center";
+  lyricsInactive: number;
+  lyricsAlign: LyricsAlign;
+  lyricsBackdrop: LyricsBackdrop;
+  lyricsHighlight: LyricsHighlight;
+  lyricsGlow: boolean;
   lyricsShowArtwork: boolean;
   lyricsMotion: boolean;
+  lyricsSource: LyricsSource;
   discordEnabled: boolean;
   discordClientId: string;
   discordDetails: string;
@@ -83,6 +102,9 @@ export interface InterfaceSettings {
   crossfadeEnabled: boolean;
   crossfadeSeconds: number;
   trimSilence: boolean;
+  autoWaveOnQueueEnd: boolean;
+  autoWaveSource: AutoWaveSource;
+  repeatPlaylistAlways: boolean;
   censorBypass: boolean;
   censorBadge: boolean;
   minimizeToTray: boolean;
@@ -135,14 +157,25 @@ export const defaultInterfaceSettings: InterfaceSettings = {
   miniPadding: 10,
   miniVolumeSlider: true,
   miniVolumeHeight: 40,
+  miniWidth: 396,
+  miniHeight: 152,
   playerVisualizer: true,
   lyricsFontSize: 36,
+  lyricsLineHeight: 1.18,
+  lyricsWeight: 700,
+  lyricsFont: "sans",
+  lyricsFontCustom: "",
   lyricsBackgroundBlur: 38,
   lyricsBackgroundOpacity: 48,
   lyricsLineBlur: 2.5,
+  lyricsInactive: 32,
   lyricsAlign: "left",
+  lyricsBackdrop: "cover",
+  lyricsHighlight: "white",
+  lyricsGlow: true,
   lyricsShowArtwork: true,
   lyricsMotion: true,
+  lyricsSource: "auto",
   discordEnabled: true,
   discordClientId: DEFAULT_DISCORD_CLIENT_ID,
   discordDetails: "{title}",
@@ -157,6 +190,9 @@ export const defaultInterfaceSettings: InterfaceSettings = {
   crossfadeEnabled: true,
   crossfadeSeconds: 4,
   trimSilence: false,
+  autoWaveOnQueueEnd: true,
+  autoWaveSource: "playlist",
+  repeatPlaylistAlways: false,
   censorBypass: true,
   censorBadge: true,
   minimizeToTray: true,

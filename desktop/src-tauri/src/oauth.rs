@@ -115,7 +115,7 @@ pub async fn oauth_device_start(app: AppHandle) -> Result<DeviceInfo, String> {
                 .await;
             let resp = match resp {
                 Ok(r) => r,
-                Err(_) => continue, // сетевой сбой - продолжаем опрос
+                Err(_) => continue,
             };
             let data: TokenResp = match resp.json().await {
                 Ok(d) => d,

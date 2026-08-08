@@ -50,7 +50,7 @@
           <Icon name="chevronDown" :size="13" class="account-chevron" />
           <q-menu class="menu" anchor="bottom right" self="top right">
             <div class="menu-body profile-menu">
-              <div class="profile-menu-head">
+              <div class="profile-head">
                 <div class="profile-menu-avatar">
                   <img
                     v-if="avatarUrl"
@@ -72,19 +72,24 @@
                 </div>
               </div>
 
-              <div class="profile-menu-actions">
-                <div
-                  class="menu-item"
-                  v-close-popup
-                  @click="router.push('/settings')"
-                >
-                  <Icon name="settings" :size="16" />
-                  <span>Настройки</span>
-                </div>
-                <div class="menu-item danger" v-close-popup @click="doLogout">
-                  <Icon name="logout" :size="16" />
-                  <span>Выйти</span>
-                </div>
+              <div class="menu-sep" />
+
+              <div
+                v-for="link in profileLinks"
+                :key="link.to"
+                class="menu-item"
+                v-close-popup
+                @click="router.push(link.to)"
+              >
+                <Icon :name="link.icon" :size="17" />
+                <span>{{ link.label }}</span>
+              </div>
+
+              <div class="menu-sep" />
+
+              <div class="menu-item danger" v-close-popup @click="doLogout">
+                <Icon name="logout" :size="17" />
+                <span>Выйти из аккаунта</span>
               </div>
             </div>
           </q-menu>
@@ -123,12 +128,14 @@
 
         <div class="row items-center no-wrap side-head">
           <span class="col">Плейлисты</span>
-          <span class="faint t-11">{{ library.playlists.length || "" }}</span>
+          <span class="faint t-11">{{
+            library.visiblePlaylists.length || ""
+          }}</span>
         </div>
 
         <q-scroll-area class="col">
           <div
-            v-for="pl in library.sortedPlaylists"
+            v-for="pl in sidebarPlaylists"
             :key="pl.kind"
             class="side-item"
             :class="{ on: route.path === `/playlists/${pl.kind}` }"
@@ -180,9 +187,74 @@
                   <Icon name="queue" :size="17" />
                   <span>Открыть плейлист</span>
                 </div>
+                <div class="menu-sep" />
+                <div
+                  class="menu-item"
+                  v-close-popup
+                  @click="library.toggleHidden(pl.kind)"
+                >
+                  <Icon
+                    :name="library.isHidden(pl.kind) ? 'eye' : 'eyeOff'"
+                    :size="17"
+                  />
+                  <span>{{
+                    library.isHidden(pl.kind)
+                      ? "Вернуть в коллекцию"
+                      : "Скрыть плейлист"
+                  }}</span>
+                </div>
               </div>
             </q-menu>
           </div>
+
+          <template v-if="library.hiddenPlaylists.length">
+            <button
+              type="button"
+              class="side-hidden-toggle"
+              :class="{ open: showHidden }"
+              @click="showHidden = !showHidden"
+            >
+              <span class="side-hidden-chevron">
+                <Icon name="chevronRight" :size="12" />
+              </span>
+              <span class="col">Скрытые</span>
+              <span class="side-hidden-count">{{
+                library.hiddenPlaylists.length
+              }}</span>
+            </button>
+
+            <div
+              v-for="pl in showHidden ? library.hiddenPlaylists : []"
+              :key="`hidden-${pl.kind}`"
+              class="side-item side-item-hidden"
+              :class="{ on: route.path === `/playlists/${pl.kind}` }"
+              @click="router.push(`/playlists/${pl.kind}`)"
+            >
+              <div
+                class="cover"
+                style="width: 30px; height: 30px; border-radius: 7px"
+              >
+                <img
+                  loading="lazy"
+                  decoding="async"
+                  v-if="pl.cover_url"
+                  :src="pl.cover_url"
+                />
+                <Icon v-else name="queue" :size="14" class="faint" />
+              </div>
+              <div class="col" style="min-width: 0">
+                <div class="ellipsis t-13">{{ pl.title }}</div>
+              </div>
+              <button
+                type="button"
+                class="icon-btn xs"
+                title="Вернуть в коллекцию"
+                @click.stop="library.toggleHidden(pl.kind)"
+              >
+                <Icon name="eye" :size="14" />
+              </button>
+            </div>
+          </template>
 
           <div
             v-if="!library.playlists.length"
@@ -403,6 +475,16 @@ const accountSub = computed(() =>
     : accountLogin.value || "Яндекс Музыка",
 );
 
+const profileLinks = [
+  { to: "/liked", label: "Любимое", icon: "heart" },
+  { to: "/playlists", label: "Коллекция", icon: "library" },
+  { to: "/stats", label: "Статистика", icon: "stats" },
+  { to: "/settings", label: "Настройки", icon: "settings" },
+];
+
+const showHidden = ref(false);
+const sidebarPlaylists = computed(() => library.visiblePlaylists);
+
 const query = ref("");
 const rightPanel = computed({
   get: () => panels.queueOpen,
@@ -411,12 +493,7 @@ const rightPanel = computed({
   },
 });
 
-const lyricsVisible = computed(
-  () =>
-    player.showLyrics &&
-    !!player.current &&
-    !route.path.startsWith("/settings"),
-);
+const lyricsVisible = computed(() => player.showLyrics && !!player.current);
 
 const lyricsBox = computed(() => ({
   top: "40px",
@@ -427,8 +504,8 @@ const lyricsBox = computed(() => ({
 
 const nav = [
   { to: "/", label: "Главное", icon: "home" },
-  { to: "/wave", label: "Моя волна", icon: "wave" },
   { to: "/search", label: "Поиск", icon: "search" },
+  { to: "/wave", label: "Моя волна", icon: "wave" },
   { to: "/liked", label: "Мне нравится", icon: "heart" },
   { to: "/playlists", label: "Коллекция", icon: "library" },
   { to: "/library", label: "Поиск в библиотеке", icon: "filter" },
@@ -448,7 +525,6 @@ const queueScroll = ref<ScrollAreaRef>(null);
 const followCurrent = ref(true);
 let autoScrolling = false;
 
-/** Очередь целиком: и сыгранные треки, и всё, что впереди. */
 const queueItems = computed(() =>
   (player.queue ?? []).map((track, index) => ({ track, index })),
 );
@@ -461,7 +537,6 @@ function currentEl(): { target: HTMLElement; el: HTMLElement } | null {
   return target && el ? { target, el } : null;
 }
 
-/** Центрирует играющий трек в видимой области очереди. */
 async function scrollToCurrent(duration = 0) {
   await nextTick();
   const found = currentEl();
@@ -496,7 +571,6 @@ function locateCurrent() {
   void scrollToCurrent(220);
 }
 
-// При открытии панели сразу показываем текущий трек.
 watch(
   () => panels.queueOpen,
   (open) => {
@@ -506,7 +580,6 @@ watch(
   },
 );
 
-// При смене трека догоняем его, если пользователь не ушёл листать список.
 watch(
   () => player.index,
   () => {

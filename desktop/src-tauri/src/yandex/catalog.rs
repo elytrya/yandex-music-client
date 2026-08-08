@@ -456,20 +456,14 @@ impl Yandex {
                 .or_else(|| album.as_ref().and_then(|a| text(a.get("originalReleaseDate"))))
         });
 
-        let source = text(item.get("major").and_then(|m| m.get("name"))).or_else(|| {
-            text(
-                album
-                    .as_ref()
-                    .and_then(|a| a.get("major"))
-                    .and_then(|m| m.get("name")),
-            )
-        });
+        let mut source = major_name(item.get("major"))
+            .or_else(|| major_name(album.as_ref().and_then(|a| a.get("major"))));
 
         let mut labels = names(item.get("labels"));
         if labels.is_empty() {
             labels = names(album.as_ref().and_then(|a| a.get("labels")));
         }
-        if labels.is_empty() || release_date.is_none() {
+        if labels.is_empty() || release_date.is_none() || source.is_none() {
             let album_id = album
                 .as_ref()
                 .and_then(|a| a.get("id"))
@@ -487,8 +481,17 @@ impl Yandex {
                         release_date = text(full.get("releaseDate"))
                             .or_else(|| text(full.get("originalReleaseDate")));
                     }
+                    if source.is_none() {
+                        source = major_name(full.get("major"))
+                            .or_else(|| distributor(full.get("labels")));
+                    }
                 }
             }
+        }
+
+        if source.is_none() {
+            source = distributor(item.get("labels"))
+                .or_else(|| distributor(album.as_ref().and_then(|a| a.get("labels"))));
         }
 
         Ok(TrackInfoDto {
@@ -527,5 +530,57 @@ impl Yandex {
         list.first()
             .map(map_track)
             .ok_or_else(|| "Трек не найден".to_string())
+    }
+}
+
+fn major_name(value: Option<&serde_json::Value>) -> Option<String> {
+    let raw = value
+        .and_then(|m| m.get("name"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())?;
+
+    let upper = raw.to_uppercase();
+    if matches!(
+        upper.as_str(),
+        "UNKNOWN" | "NO_MAJOR" | "NOMAJOR" | "NONE" | "OTHER" | "-"
+    ) {
+        return None;
+    }
+
+    let pretty = match upper.as_str() {
+        "WARNER" => "Warner Music",
+        "UNIVERSAL" => "Universal Music",
+        "SONY" => "Sony Music",
+        "BELIEVE" => "Believe",
+        "MERLIN" => "Merlin",
+        "ORCHARD" => "The Orchard",
+        "FRESHTUNES" => "FreshTunes",
+        "DISTROKID" => "DistroKid",
+        "NATIONAL" => "Национальное музыкальное издательство",
+        _ => raw,
+    };
+    Some(pretty.to_string())
+}
+
+fn distributor(value: Option<&serde_json::Value>) -> Option<String> {
+    let items = value.and_then(|v| v.as_array())?;
+    let names: Vec<String> = items
+        .iter()
+        .filter(|item| {
+            item.get("type")
+                .and_then(|t| t.as_str())
+                .map(|t| t.eq_ignore_ascii_case("distributor"))
+                .unwrap_or(false)
+        })
+        .filter_map(|item| item.get("name").and_then(|n| n.as_str()))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if names.is_empty() {
+        None
+    } else {
+        Some(names.join(", "))
     }
 }

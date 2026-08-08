@@ -65,16 +65,6 @@
                 </span>
               </div>
 
-              <div v-if="artist.genres.length" class="head-chips">
-                <span
-                  v-for="genre in artist.genres.slice(0, 4)"
-                  :key="genre"
-                  class="chip"
-                >
-                  {{ genre }}
-                </span>
-              </div>
-
               <div class="head-actions">
                 <button
                   class="btn-solid"
@@ -146,7 +136,6 @@
                   class="chip chip-menu"
                   type="button"
                 >
-                  <Icon name="share" :size="13" />
                   <span>Ссылки и соцсети</span>
                   <span class="chip-count">{{ normalizedLinks.length }}</span>
                   <Icon name="chevronDown" :size="12" />
@@ -186,23 +175,11 @@
                   </q-menu>
                 </button>
 
-                <span
-                  v-for="link in socialLinks.slice(0, 6)"
-                  :key="`ic-${link.href}`"
-                  class="chip chip-social"
-                  role="button"
-                  :title="link.title"
-                  @click="openLink(link.href)"
-                >
-                  <Icon :name="iconForLink(link)" :size="14" />
-                </span>
-
                 <button
                   class="chip chip-menu"
                   type="button"
                   @click="infoOpen = true"
                 >
-                  <Icon name="info" :size="13" />
                   <span>Подробнее</span>
                 </button>
               </div>

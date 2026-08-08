@@ -188,22 +188,21 @@
 }
 
 .profile-menu {
-  width: 246px;
-  padding: 6px;
+  width: 236px;
+  padding: 5px;
 }
 
-.profile-menu-head {
+.profile-head {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 11px;
-  margin-bottom: 6px;
-  padding: 8px 8px 12px;
-  border-bottom: 1px solid var(--line);
+  gap: 10px;
+  padding: 7px 8px 9px;
 }
 
 .profile-menu-avatar {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
 }
 
 .profile-menu .profile-menu-avatar {
@@ -211,11 +210,12 @@
 }
 
 .profile-menu-avatar .avatar-monogram {
-  font-size: 18px;
+  font-size: 15px;
 }
 
 .profile-menu-id {
   min-width: 0;
+  flex: 1;
 }
 
 .profile-menu-name {
@@ -236,6 +236,8 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  padding-top: 5px;
+  border-top: 1px solid var(--line);
 }
 
 .profile-menu .menu-item {

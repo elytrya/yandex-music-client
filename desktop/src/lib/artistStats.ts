@@ -47,16 +47,11 @@ function sameNumbers(a: ArtistSnapshot, b: ArtistSnapshot): boolean {
   );
 }
 
-/** Возвращает всю сохранённую историю показателей артиста. */
 export function artistHistory(id: string): ArtistSnapshot[] {
   const list = readStore()[id];
   return Array.isArray(list) ? [...list].sort((a, b) => a.t - b.t) : [];
 }
 
-/**
- * Сохраняет текущий срез показателей артиста.
- * Новая точка пишется, если данные изменились либо прошло больше MIN_GAP_MS.
- */
 export function recordArtistStats(artist: ArtistPage): ArtistSnapshot[] {
   if (!artist?.id) return [];
 
@@ -102,10 +97,6 @@ function pickBaseline(
   return baseline ?? history[0] ?? null;
 }
 
-/**
- * Считает прирост показателя относительно предыдущего замера
- * либо относительно точки, снятой не менее `days` дней назад.
- */
 export function statDelta(
   history: ArtistSnapshot[],
   field: keyof Omit<ArtistSnapshot, "t">,
@@ -132,7 +123,6 @@ export function statDelta(
   };
 }
 
-/** Точки для мини-графика: только замеры с известным значением. */
 export function seriesOf(
   history: ArtistSnapshot[],
   field: keyof Omit<ArtistSnapshot, "t">,

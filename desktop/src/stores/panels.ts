@@ -27,7 +27,12 @@ export const usePanelsStore = defineStore("panels", {
       if (this.miniBusy || this.mini) return;
       this.miniBusy = true;
       try {
-        await api.enterMiniPlayer();
+        const { useUiStore } = await import("@/stores/ui/index");
+        const ui = useUiStore();
+        await api.enterMiniPlayer(
+          ui.settings.miniWidth,
+          ui.settings.miniHeight,
+        );
         this.mini = true;
       } catch (e) {
         this.mini = false;

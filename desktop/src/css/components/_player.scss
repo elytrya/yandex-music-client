@@ -172,7 +172,6 @@
   gap: var(--player-gap, 6px);
 }
 
-/* Размер иконок управляется из настроек. */
 .player-zone svg,
 .player-controls svg,
 .player-right svg {
@@ -445,7 +444,6 @@
   pointer-events: none;
 }
 
-/* смена обложки и названия трека */
 .pb-cover-enter-active,
 .pb-cover-leave-active {
   transition:
@@ -490,7 +488,6 @@
   transform: translateY(-7px);
 }
 
-/* переключение иконок воспроизведения */
 .ic-pop-enter-active {
   transition:
     opacity 0.14s ease-out,

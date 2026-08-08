@@ -1,8 +1,7 @@
-
 const LIST_URL =
   "https://raw.githubusercontent.com/Hazzz895/FckCensorData/refs/heads/main/list.json";
 const CACHE_KEY = "mashiro.censor.map";
-const TTL = 1000 * 60 * 60 * 24; // сутки
+const TTL = 1000 * 60 * 60 * 24;
 
 let map: Record<string, string> = {};
 let loaded = false;
@@ -31,8 +30,7 @@ function loadCache(): Record<string, string> | null {
 function persist(): void {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), map }));
-  } catch {
-  }
+  } catch {}
 }
 
 export async function ensureCensorList(): Promise<void> {
@@ -78,4 +76,46 @@ export function isCensored(id: string | null | undefined): boolean {
 export function censorUrl(id: string | null | undefined): string | null {
   if (!id) return null;
   return map[key(String(id))] ?? null;
+}
+
+const PREFER_KEY = "mashiro.censor.prefer";
+
+type Preference = "clean" | "original";
+
+function readPrefer(): Record<string, Preference> {
+  try {
+    const raw = localStorage.getItem(PREFER_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, Preference>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+let prefer: Record<string, Preference> = readPrefer();
+
+function persistPrefer(): boolean {
+  try {
+    localStorage.setItem(PREFER_KEY, JSON.stringify(prefer));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function prefersOriginal(id: string | null | undefined): boolean {
+  if (!id) return false;
+  return prefer[key(String(id))] === "original";
+}
+
+export function setPrefersOriginal(
+  id: string | null | undefined,
+  value: boolean,
+): boolean {
+  if (!id) return false;
+  const k = key(String(id));
+  if (value) prefer[k] = "original";
+  else delete prefer[k];
+  return persistPrefer();
 }

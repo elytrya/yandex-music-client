@@ -33,7 +33,6 @@ export {
   miniButtonOrder,
   playerButtonCatalog,
   playerButtonOrder,
-  playerZoneLabels,
 } from "./playerButtons";
 
 export type { CoverStyle, Density, InterfaceSettings } from "./defaults";
@@ -48,10 +47,6 @@ const STORAGE_KEY = "mashiro.interface";
 
 const lockedMiniButtons = new Set<MiniButtonId>(["prev", "play", "next"]);
 
-/**
- * Собирает корректный порядок: сначала сохранённые и всё ещё существующие id,
- * потом всё, что появилось в новых версиях приложения.
- */
 function sanitizeOrder<T extends string>(
   saved: unknown,
   canonical: readonly T[],
@@ -90,6 +85,7 @@ function load(): InterfaceSettings {
     } as MiniButtonSlots;
     merged.playerOrder = sanitizeOrder(saved.playerOrder, playerButtonOrder);
     merged.miniOrder = sanitizeOrder(saved.miniOrder, miniButtonOrder);
+    merged.playerEditMode = false;
     merged.playerButtons.play = "center";
     merged.miniButtons.play = true;
     merged.miniButtons.prev = true;
@@ -104,7 +100,10 @@ function load(): InterfaceSettings {
 }
 
 export const useUiStore = defineStore("ui", {
-  state: () => ({ settings: load() }),
+  state: () => ({
+    settings: load(),
+    snapshot: null as InterfaceSettings | null,
+  }),
 
   actions: {
     apply() {
@@ -119,6 +118,36 @@ export const useUiStore = defineStore("ui", {
       value: InterfaceSettings[K],
     ) {
       this.settings[key] = value;
+      this.apply();
+    },
+
+    beginEdit() {
+      this.snapshot = JSON.parse(
+        JSON.stringify(this.settings),
+      ) as InterfaceSettings;
+    },
+
+    finishEdit() {
+      this.snapshot = null;
+      this.settings.playerEditMode = false;
+      this.apply();
+    },
+
+    cancelEdit() {
+      if (this.snapshot) this.settings = { ...this.snapshot };
+      this.snapshot = null;
+      this.settings.playerEditMode = false;
+      this.apply();
+    },
+
+    togglePlayerEdit(on?: boolean) {
+      const next = on ?? !this.settings.playerEditMode;
+      if (!next) {
+        this.finishEdit();
+        return;
+      }
+      this.beginEdit();
+      this.settings.playerEditMode = true;
       this.apply();
     },
 
@@ -141,27 +170,33 @@ export const useUiStore = defineStore("ui", {
       return sanitizeOrder(this.settings.miniOrder, miniButtonOrder);
     },
 
-    /**
-     * Перекладывает кнопку в зону на конкретную позицию (drag & drop).
-     * `index` — позиция внутри целевой зоны, а не во всём списке.
-     */
     movePlayerButton(id: PlayerButtonId, zone: PlayerZone, index: number) {
-      if (id === "play") return;
+      if (id === "play" && zone !== "center") return;
 
-      if (this.settings.playerButtons[id] !== zone) {
+      const wasIn = this.playerZone(id);
+      const order = this.playerOrderList().filter((x) => x !== id);
+
+      const inZone = order.filter((x) => this.playerZone(x) === zone);
+      const raw = Number.isFinite(index) ? Math.round(index) : inZone.length;
+      const clamped = Math.max(0, Math.min(raw, inZone.length));
+
+      let at: number;
+      if (!inZone.length) {
+        at = order.length;
+      } else if (clamped < inZone.length) {
+        at = order.indexOf(inZone[clamped]);
+      } else {
+        at = order.indexOf(inZone[inZone.length - 1]) + 1;
+      }
+
+      order.splice(at, 0, id);
+
+      if (wasIn !== zone) {
         this.settings.playerButtons = {
           ...this.settings.playerButtons,
           [id]: zone,
         };
       }
-
-      const order = this.playerOrderList().filter((x) => x !== id);
-      const inZone = order.filter((x) => this.playerZone(x) === zone);
-      const clamped = Math.max(0, Math.min(index, inZone.length));
-      const anchor = inZone[clamped];
-
-      const at = anchor ? order.indexOf(anchor) : order.length;
-      order.splice(at, 0, id);
 
       this.settings.playerOrder = order;
       this.apply();
@@ -169,7 +204,8 @@ export const useUiStore = defineStore("ui", {
 
     moveMiniButton(id: MiniButtonId, index: number) {
       const order = this.miniOrderList().filter((x) => x !== id);
-      const clamped = Math.max(0, Math.min(index, order.length));
+      const raw = Number.isFinite(index) ? Math.round(index) : order.length;
+      const clamped = Math.max(0, Math.min(raw, order.length));
       order.splice(clamped, 0, id);
       this.settings.miniOrder = order;
       this.apply();
@@ -206,7 +242,6 @@ export const useUiStore = defineStore("ui", {
       this.apply();
     },
 
-    /** Сброс только геометрии плеера (размеры, отступы, прогресс). */
     resetPlayerLayout() {
       const d = defaultInterfaceSettings;
       this.settings.playerHeight = d.playerHeight;
@@ -221,7 +256,6 @@ export const useUiStore = defineStore("ui", {
       this.apply();
     },
 
-    /** Сброс только настроек мини-плеера. */
     resetMiniLayout() {
       const d = defaultInterfaceSettings;
       this.settings.miniOpacity = d.miniOpacity;
@@ -233,6 +267,8 @@ export const useUiStore = defineStore("ui", {
       this.settings.miniVolumeHeight = d.miniVolumeHeight;
       this.settings.miniShowTime = d.miniShowTime;
       this.settings.miniVisualizer = d.miniVisualizer;
+      this.settings.miniWidth = d.miniWidth;
+      this.settings.miniHeight = d.miniHeight;
       this.apply();
     },
 
@@ -249,12 +285,20 @@ export const useUiStore = defineStore("ui", {
     resetLyrics() {
       const d = defaultInterfaceSettings;
       this.settings.lyricsFontSize = d.lyricsFontSize;
+      this.settings.lyricsLineHeight = d.lyricsLineHeight;
+      this.settings.lyricsWeight = d.lyricsWeight;
+      this.settings.lyricsFont = d.lyricsFont;
       this.settings.lyricsBackgroundBlur = d.lyricsBackgroundBlur;
       this.settings.lyricsBackgroundOpacity = d.lyricsBackgroundOpacity;
       this.settings.lyricsLineBlur = d.lyricsLineBlur;
+      this.settings.lyricsInactive = d.lyricsInactive;
       this.settings.lyricsAlign = d.lyricsAlign;
+      this.settings.lyricsBackdrop = d.lyricsBackdrop;
+      this.settings.lyricsHighlight = d.lyricsHighlight;
+      this.settings.lyricsGlow = d.lyricsGlow;
       this.settings.lyricsShowArtwork = d.lyricsShowArtwork;
       this.settings.lyricsMotion = d.lyricsMotion;
+      this.settings.lyricsSource = d.lyricsSource;
       this.apply();
     },
   },

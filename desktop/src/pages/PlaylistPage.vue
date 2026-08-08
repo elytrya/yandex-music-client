@@ -358,7 +358,9 @@
           @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
         >
           <span class="t-13 w-600">{{ sortDir === "asc" ? "↑" : "↓" }}</span>
-          <span>{{ sortDir === "asc" ? "По возрастанию" : "По убыванию" }}</span>
+          <span>{{
+            sortDir === "asc" ? "По возрастанию" : "По убыванию"
+          }}</span>
         </button>
 
         <div class="col" />
@@ -659,8 +661,7 @@ const sortOptions: Array<{ id: SortMode; label: string }> = [
 const kindNumber = computed(() => Number(props.kind));
 const isPinned = computed(() => library.isPinned(kindNumber.value));
 const canReorder = computed(
-  () =>
-    sortMode.value === "custom" && sortDir.value === "asc" && !filter.value,
+  () => sortMode.value === "custom" && sortDir.value === "asc" && !filter.value,
 );
 
 const sortLabel = computed(
@@ -994,8 +995,7 @@ async function refreshLocal() {
     try {
       const path = await api.findLocalTrack(track.id, dir);
       if (path) found.add(track.id);
-    } catch {
-    }
+    } catch {}
   }
   localIds.value = found;
 }

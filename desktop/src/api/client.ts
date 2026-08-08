@@ -5,6 +5,10 @@ import type {
   AlbumPage,
   ArtistPage,
   FeedbackPayload,
+  GeniusArtist,
+  GeniusHit,
+  GeniusSong,
+  LrcLyrics,
   Lyrics,
   Playlist,
   PlaylistMembership,
@@ -201,8 +205,7 @@ export const api = {
   stream: (id: string, quality: Quality = "lossless") =>
     call<Stream>("get_stream", { id, quality }),
 
-  prefetchStream: (url: string) =>
-    call<void>("prefetch_stream", { url }),
+  prefetchStream: (url: string) => call<void>("prefetch_stream", { url }),
 
   clearStreamCache: () => call<void>("clear_stream_cache"),
 
@@ -238,7 +241,14 @@ export const api = {
 
   clearGlobalHotkeys: () => call<void>("clear_global_hotkeys"),
 
-  enterMiniPlayer: () => call<void>("enter_mini_player"),
+  enterMiniPlayer: (width?: number, height?: number) =>
+    call<void>("enter_mini_player", {
+      width: width ?? null,
+      height: height ?? null,
+    }),
+
+  resizeMiniPlayer: (width: number, height: number) =>
+    call<void>("resize_mini_player", { width, height }),
 
   exitMiniPlayer: () => call<void>("exit_mini_player"),
 
@@ -248,4 +258,30 @@ export const api = {
   readTextFile: (path: string) => call<string>("read_text_file", { path }),
 
   openExternal: (url: string) => call<void>("open_external", { url }),
+
+  geniusCheck: (token: string) => call<string>("genius_check", { token }),
+
+  geniusSearch: (token: string, query: string) =>
+    call<GeniusHit[]>("genius_search", { token, query }),
+
+  geniusSong: (token: string, id: number) =>
+    call<GeniusSong>("genius_song", { token, id }),
+
+  geniusLookup: (token: string, title: string, artist: string, force = false) =>
+    call<GeniusSong | null>("genius_lookup", { token, title, artist, force }),
+
+  geniusArtist: (token: string, id: number) =>
+    call<GeniusArtist>("genius_artist", { token, id }),
+
+  geniusClearCache: () => call<void>("genius_clear_cache"),
+
+  lrclibLookup: (args: {
+    title: string;
+    artist: string;
+    album?: string | null;
+    duration?: number | null;
+    force?: boolean;
+  }) => call<LrcLyrics | null>("lrclib_lookup", args),
+
+  lrclibClearCache: () => call<void>("lrclib_clear_cache"),
 };

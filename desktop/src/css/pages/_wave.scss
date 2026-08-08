@@ -6,272 +6,408 @@
 
 .wave-scroll {
   height: 100%;
-  overflow-y: auto;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .wave-content {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 24px var(--page-padding) 52px;
   display: flex;
+  max-width: 860px;
   flex-direction: column;
-  gap: 22px;
+  margin: 0 auto;
+  gap: 26px;
+  padding: 26px var(--page-padding) 56px;
 }
 
-.wave-top {
+.wave-hero {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.wave-top-info {
+  align-items: center;
+  gap: 18px;
   min-width: 0;
 }
 
-.wave-top-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+.wave-hero-art {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  width: 132px;
+  height: 132px;
+  flex: none;
+  border-radius: 16px;
+  background: var(--surface-2);
+  place-items: center;
+}
+
+.wave-hero-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wave-hero-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.wave-hero-eyebrow {
   color: var(--fg-faint);
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.wave-top h1 {
-  margin: 3px 0 0;
-  font-size: 23px;
+.wave-hero h1 {
+  overflow: hidden;
+  margin: 6px 0 0;
+  font-size: 30px;
   font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.15;
-  white-space: nowrap;
-  overflow: hidden;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.wave-top p {
-  margin: 4px 0 0;
-  font-size: 12.5px;
+.wave-hero-sub {
+  overflow: hidden;
+  margin: 6px 0 0;
   color: var(--fg-dim);
-  white-space: nowrap;
-  overflow: hidden;
+  font-size: 13px;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.wave-top-controls {
+.wave-hero-sub .link {
+  color: inherit;
+}
+
+.wave-hero-sub .link:hover {
+  color: var(--fg);
+}
+
+.wave-hero-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  margin-top: 16px;
+  gap: 8px;
+}
+
+.wave-play {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  padding: 0 18px 0 15px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 640;
+  gap: 8px;
+  transition:
+    transform 0.14s ease,
+    opacity 0.14s ease;
+}
+
+.wave-play:hover {
+  transform: scale(1.02);
+}
+
+.wave-play:active {
+  transform: scale(0.98);
 }
 
 .wave-ic {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: 50%;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
   background: transparent;
   color: var(--fg-dim);
   cursor: pointer;
+  place-items: center;
   transition:
     background 0.14s ease,
     color 0.14s ease,
-    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  &:hover {
-    background: var(--hover);
-    color: var(--fg);
-  }
-
-  &:active {
-    transform: scale(0.88);
-  }
+    border-color 0.14s ease;
 }
 
-.wave-ic-play {
-  width: 38px;
-  height: 38px;
-  background: var(--accent);
-  color: #fff;
-
-  &:hover {
-    background: var(--accent);
-    color: #fff;
-    filter: brightness(1.07);
-  }
+.wave-ic:hover {
+  border-color: transparent;
+  background: var(--surface-2);
+  color: var(--fg);
 }
 
 .wave-notice {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   margin: 0;
-  font-size: 13px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: var(--surface);
   color: var(--fg-dim);
+  font-size: 12.5px;
+  gap: 12px;
+}
 
-  button {
-    border: none;
-    background: transparent;
-    color: var(--accent);
-    font-size: 13px;
-    cursor: pointer;
-    padding: 0;
-  }
+.wave-notice button {
+  border: 0;
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.wave-stations {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .wave-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex: 1;
+  overflow-x: auto;
+  padding-bottom: 2px;
   gap: 7px;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  touch-action: pan-y;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.wave-chips.dragging {
+  cursor: grabbing;
+  scroll-snap-type: none;
+}
+
+.wave-chips.dragging .wave-chip {
+  pointer-events: none;
+}
+
+.wave-chips.edge-left {
+  mask-image: linear-gradient(to right, transparent 0, #000 26px);
+}
+
+.wave-chips.edge-right {
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - 26px),
+    transparent 100%
+  );
+}
+
+.wave-chips.edge-left.edge-right {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 26px,
+    #000 calc(100% - 26px),
+    transparent 100%
+  );
+}
+
+.wave-stations-arrow {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  place-items: center;
+  transform: translateY(-50%);
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.wave-stations-arrow:hover {
+  border-color: transparent;
+  background: var(--surface-2);
+}
+
+.wave-stations-arrow.left {
+  left: 0;
+}
+
+.wave-stations-arrow.right {
+  right: 0;
+}
+
+.wave-chips::-webkit-scrollbar {
+  display: none;
 }
 
 .wave-chip {
-  height: 30px;
-  padding: 0 13px;
+  height: 32px;
+  flex: none;
+  scroll-snap-align: start;
+  padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
   color: var(--fg-dim);
-  font-size: 12px;
-  font-weight: 500;
   cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 560;
+  white-space: nowrap;
   transition:
-    color 0.15s ease,
-    background 0.15s ease,
-    border-color 0.15s ease;
+    background 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease;
+}
 
-  &:hover {
-    color: var(--fg);
-    background: var(--hover);
-    border-color: transparent;
-  }
+.wave-chip:hover {
+  border-color: transparent;
+  background: var(--surface-2);
+  color: var(--fg);
+}
 
-  &.on {
-    color: #fff;
-    background: var(--accent);
-    border-color: transparent;
-  }
+.wave-chip.on {
+  border-color: transparent;
+  background: var(--fg);
+  color: var(--bg);
 }
 
 .wave-settings {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  gap: 2px;
 }
 
 .wave-settings-row {
   display: flex;
+  min-height: 42px;
   align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .wave-settings-label {
-  min-width: 104px;
-  font-size: 12px;
   color: var(--fg-dim);
+  font-size: 12.5px;
 }
 
-.wave-list {
-  display: flex;
-  flex-direction: column;
-
-  h3 {
-    margin: 0 0 6px;
-    font-size: 11px;
-    color: var(--fg-faint);
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
+.wave-list h3 {
+  margin: 0 0 10px;
+  color: var(--fg-faint);
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .wave-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 7px 10px;
-  margin: 0 -10px;
-  border: none;
+  padding: 6px 8px;
   border-radius: 10px;
-  background: transparent;
-  color: inherit;
-  text-align: left;
   cursor: pointer;
-  content-visibility: auto;
-  contain-intrinsic-size: 56px;
-  transition: background 0.14s ease;
+  gap: 11px;
+  transition: background 0.12s ease;
+}
 
-  &:hover {
-    background: var(--surface);
-  }
+.wave-item:hover {
+  background: var(--surface);
 }
 
 .wave-item-art {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  border-radius: 8px;
+  display: grid;
   overflow: hidden;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 7px;
   background: var(--surface-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  place-items: center;
+}
 
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    contain: content;
-  }
+.wave-item-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .wave-item-copy {
-  flex: 1;
-  min-width: 0;
   display: flex;
+  min-width: 0;
+  flex: 1;
   flex-direction: column;
+  gap: 2px;
 }
 
 .wave-item-title {
-  font-size: 13px;
-  white-space: nowrap;
   overflow: hidden;
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 540;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wave-item-sub {
-  font-size: 12px;
-  color: var(--fg-dim);
-  white-space: nowrap;
   overflow: hidden;
+  color: var(--fg-faint);
+  font-size: 11.5px;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.wave-empty {
-  margin: 0;
-  font-size: 13px;
-  color: var(--fg-dim);
+.wave-item-state {
+  flex: none;
+  color: var(--accent);
+}
+
+.wave-item.is-current {
+  background: var(--surface);
 }
 
 .wave-item.is-current .wave-item-title {
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 640;
 }
 
 .wave-item.is-played {
-  opacity: 0.55;
+  opacity: 0.45;
 }
 
-.wave-item-state {
-  flex-shrink: 0;
-  color: var(--accent);
+.wave-empty {
+  margin: 0;
+  color: var(--fg-faint);
+  font-size: 13px;
 }
 
-.wave-top-artists .link {
-  cursor: pointer;
+@media (max-width: 720px) {
+  .wave-hero {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .wave-hero-art {
+    width: 96px;
+    height: 96px;
+  }
+
+  .wave-hero h1 {
+    font-size: 23px;
+  }
 }

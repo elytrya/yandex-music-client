@@ -150,12 +150,84 @@
 
       <div class="sep" style="margin: 6px 4px" />
 
+      <div
+        v-if="cleanAvailable"
+        class="menu-item"
+        v-close-popup
+        @click="toggleCensorVersion"
+      >
+        <Icon :name="playsOriginal ? 'heartOff' : 'yandex'" :size="18" />
+        <span>{{
+          playsOriginal
+            ? "Играть версию без цензуры"
+            : "Играть версию с Яндекс Музыки"
+        }}</span>
+      </div>
+
+      <div class="menu-item" v-close-popup @click="openReplace">
+        <Icon name="upload" :size="18" />
+        <span>{{
+          hasReplacement ? "Своя версия — настроить" : "Подменить версию"
+        }}</span>
+      </div>
+
       <div class="menu-item" v-close-popup @click="openInfo">
         <Icon name="info" :size="18" />
         <span>О треке</span>
       </div>
     </div>
   </q-menu>
+
+  <q-dialog v-model="replaceOpen">
+    <div class="info-card">
+      <div class="row items-start no-wrap" style="gap: 12px">
+        <div class="col" style="min-width: 0">
+          <span class="info-title ellipsis">Своя версия трека</span>
+          <div class="dim t-12 ellipsis">{{ track.title }}</div>
+        </div>
+        <div class="icon-btn round" v-close-popup>
+          <Icon name="close" :size="16" />
+        </div>
+      </div>
+
+      <p class="dim t-12 q-pt-md" style="line-height: 1.45">
+        Вставь прямую ссылку на аудиофайл или путь на диске — именно он будет
+        играть вместо этого трека. Подмена сохранится и переживёт перезапуск.
+      </p>
+
+      <div class="field q-mt-md">
+        <input
+          v-model="replaceSource"
+          type="text"
+          spellcheck="false"
+          placeholder="https://…/track.mp3 или C:\Music\track.flac"
+        />
+      </div>
+
+      <div class="field q-mt-sm">
+        <input
+          v-model="replaceLabel"
+          type="text"
+          spellcheck="false"
+          placeholder="Подпись: например, «без цензуры»"
+        />
+      </div>
+
+      <div class="row items-center q-mt-md" style="gap: 8px">
+        <button class="btn-solid" type="button" @click="saveReplace">
+          Сохранить
+        </button>
+        <button
+          v-if="hasReplacement"
+          class="btn"
+          type="button"
+          @click="dropReplace"
+        >
+          Убрать подмену
+        </button>
+      </div>
+    </div>
+  </q-dialog>
 
   <q-dialog v-model="info">
     <div class="info-card">
@@ -201,6 +273,9 @@ import { openTrackLyrics } from "@/lib/dialogs";
 import { artistNames, formatDuration } from "@/lib/format";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player/index";
+import { clearOverride, getOverride, setOverride } from "@/lib/censorOverrides";
+import { ensureCensorList, isCensored, prefersOriginal } from "@/lib/censor";
+import { useUiStore } from "@/stores/ui/index";
 
 const props = withDefaults(
   defineProps<{
@@ -303,6 +378,72 @@ const track = computed(() => props.track);
 const playlistKind = computed(() => props.playlistKind);
 const isLiked = computed(() => library.liked(props.track.id));
 
+const replaceOpen = ref(false);
+const replaceSource = ref("");
+const replaceLabel = ref("");
+const replaceSaved = ref(0);
+
+const ui = useUiStore();
+const censorTick = ref(0);
+
+const cleanAvailable = computed(() => {
+  void censorTick.value;
+  return ui.settings.censorBypass && isCensored(props.track.id);
+});
+
+const playsOriginal = computed(() => {
+  void censorTick.value;
+  return prefersOriginal(props.track.id);
+});
+
+async function toggleCensorVersion() {
+  const next = !playsOriginal.value;
+  await player.useOriginalVersion(props.track.id, next);
+  censorTick.value += 1;
+  Notify.create({
+    message: next
+      ? "Играет версия с Яндекс Музыки"
+      : "Играет версия без цензуры",
+  });
+}
+
+const hasReplacement = computed(() => {
+  void replaceSaved.value;
+  return Boolean(getOverride(props.track.id));
+});
+
+function openReplace() {
+  const saved = getOverride(props.track.id);
+  replaceSource.value = saved?.source ?? "";
+  replaceLabel.value = saved?.label ?? "без цензуры";
+  replaceOpen.value = true;
+}
+
+function saveReplace() {
+  const source = replaceSource.value.trim();
+  if (!source) {
+    Notify.create({
+      type: "negative",
+      message: "Нужна ссылка или путь к файлу",
+    });
+    return;
+  }
+  setOverride(props.track.id, source, replaceLabel.value || "своя версия");
+  replaceSaved.value += 1;
+  replaceOpen.value = false;
+  Notify.create({ message: "Подмена сохранена" });
+  if (player.current?.id === props.track.id) void player.loadCurrent();
+}
+
+function dropReplace() {
+  clearOverride(props.track.id);
+  replaceSaved.value += 1;
+  replaceSource.value = "";
+  replaceOpen.value = false;
+  Notify.create({ message: "Подмена убрана" });
+  if (player.current?.id === props.track.id) void player.loadCurrent();
+}
+
 async function download() {
   Notify.create({ message: "Скачивание началось" });
   try {
@@ -345,5 +486,10 @@ function goArtist(id?: string) {
 
 onMounted(() => {
   if (!library.playlists.length) void library.init();
+  if (ui.settings.censorBypass) {
+    void ensureCensorList().then(() => {
+      censorTick.value += 1;
+    });
+  }
 });
 </script>

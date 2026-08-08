@@ -16,14 +16,23 @@ import {
   safePlay,
   resumeOnGesture,
 } from "@/lib/audio";
-import { readCache, releaseMemoryCache, swr, writeCache } from "@/lib/cache";
+import { readCache, releaseMemoryCache, writeCache } from "@/lib/cache";
+import type { LyricsOrigin } from "@/lib/lyricsSource";
+import { hasText, loadTrackLyrics } from "@/lib/lyricsSource";
 import { proxyStream } from "@/lib/stream";
-import { censorUrl, ensureCensorList } from "@/lib/censor";
+import {
+  censorUrl,
+  ensureCensorList,
+  prefersOriginal,
+  setPrefersOriginal,
+} from "@/lib/censor";
+import { overrideUrl } from "@/lib/censorOverrides";
 import { createLogger, logQuality } from "@/lib/log";
 import { useEqualizerStore } from "@/stores/equalizer";
 import { useLibraryStore } from "@/stores/library";
 import { useSleepStore } from "@/stores/sleep";
 import { useStatsStore } from "@/stores/stats";
+import type { LyricsSource } from "@/stores/ui/defaults";
 import { DEFAULT_DISCORD_CLIENT_ID, useUiStore } from "@/stores/ui/index";
 import { artistNames } from "@/lib/format";
 import { setTrayTooltip } from "@/lib/tray";
@@ -51,7 +60,6 @@ interface PrefetchEntry {
 
 const prefetched = new Map<string, PrefetchEntry>();
 
-/** Отсекает повторы по id, сохраняя первое вхождение. */
 function dedupeTracks(tracks: Track[], known?: Set<string>): Track[] {
   const seen = known ?? new Set<string>();
   const out: Track[] = [];
@@ -92,6 +100,7 @@ interface PlayerState {
   currentSource: string | null;
   playingLocal: boolean;
   censorReplaced: boolean;
+  censorAvailable: boolean;
   loading: boolean;
   waveBatchId: string | null;
   isWave: boolean;
@@ -102,6 +111,8 @@ interface PlayerState {
   lyrics: Lyrics | null;
   lyricsLoading: boolean;
   lyricsError: string | null;
+  lyricsOrigin: LyricsOrigin | null;
+  lyricsPick: LyricsSource | null;
   showLyrics: boolean;
   lyricsFullscreen: boolean;
   fullscreen: boolean;
@@ -118,6 +129,16 @@ let lastSessionSave = 0;
 let lastProgress = 0;
 let quietSince = 0;
 let skipGuard = 0;
+
+let loadChain: Promise<void> = Promise.resolve();
+let navSeq = 0;
+let lastLoadAt = 0;
+let stallTimer: number | null = null;
+let stallAt = 0;
+let stallSince = 0;
+let recoverStep = 0;
+let lastRecover = 0;
+let radioStarted = false;
 
 export const usePlayerStore = defineStore("player", {
   state: (): PlayerState => {
@@ -141,6 +162,7 @@ export const usePlayerStore = defineStore("player", {
       currentSource: null,
       playingLocal: false,
       censorReplaced: false,
+      censorAvailable: false,
       loading: false,
       waveBatchId: null,
       isWave: false,
@@ -151,6 +173,8 @@ export const usePlayerStore = defineStore("player", {
       lyrics: null,
       lyricsLoading: false,
       lyricsError: null,
+      lyricsOrigin: null,
+      lyricsPick: null,
       showLyrics: false,
       lyricsFullscreen: false,
       fullscreen: false,
@@ -164,7 +188,12 @@ export const usePlayerStore = defineStore("player", {
   },
 
   getters: {
-    hasNext: (s) => s.index < s.queue.length - 1 || s.repeat === "all",
+    hasNext: (s) => {
+      if (s.index < s.queue.length - 1 || s.repeat === "all") return true;
+      if (!s.queue.length) return false;
+      const ui = useUiStore().settings;
+      return ui.repeatPlaylistAlways || ui.autoWaveOnQueueEnd;
+    },
     hasPrev: (s) => s.index > 0,
     waveActive: (s) => s.isWave && Boolean(s.current),
     qualityLabel: (s) => {
@@ -254,6 +283,16 @@ export const usePlayerStore = defineStore("player", {
         this.persistSession();
         void this.syncTray();
       };
+      audio.onplaying = () => {
+        stallAt = audio.currentTime;
+        stallSince = 0;
+        recoverStep = 0;
+      };
+      audio.onerror = () => {
+        if (!this.current || this.loading) return;
+        log.warn("audio error", audio.error?.code ?? null);
+        void this.recoverPlayback(audio.currentTime, true);
+      };
 
       useEqualizerStore().apply();
 
@@ -261,6 +300,12 @@ export const usePlayerStore = defineStore("player", {
         presenceTimer = window.setInterval(() => {
           void this.syncPresence();
         }, 15000);
+      }
+
+      if (stallTimer === null) {
+        stallTimer = window.setInterval(() => {
+          this.watchStall();
+        }, 2000);
       }
     },
 
@@ -350,6 +395,7 @@ export const usePlayerStore = defineStore("player", {
         isWave: this.isWave,
         stationId: this.stationId,
         stationName: this.stationName,
+        waveBatchId: this.waveBatchId,
         savedAt: Date.now(),
       });
     },
@@ -369,6 +415,7 @@ export const usePlayerStore = defineStore("player", {
       this.isWave = data.isWave;
       this.stationId = data.stationId;
       this.stationName = data.stationName;
+      this.waveBatchId = data.waveBatchId;
       this.seenIds = data.queue.map((t) => t.id).slice(-2000);
       this.current = track;
       this.duration = (track.duration_ms ?? 0) / 1000;
@@ -379,6 +426,7 @@ export const usePlayerStore = defineStore("player", {
       if (autoplay) {
         await this.loadCurrent({ startAt: data.progress, autoplay: true });
       }
+      if (this.isWave) void this.armWave();
       return true;
     },
 
@@ -395,6 +443,7 @@ export const usePlayerStore = defineStore("player", {
       void api.clearStreamCache().catch(() => undefined);
       releaseMemoryCache();
       this.lyrics = null;
+      this.lyricsOrigin = null;
       this.showLyrics = false;
       this.lyricsFullscreen = false;
       this.fullscreen = false;
@@ -436,6 +485,7 @@ export const usePlayerStore = defineStore("player", {
         await api
           .sendFeedback({ type: "radioStarted", station_id: station })
           .catch(() => undefined);
+        radioStarted = true;
 
         const cachedLast = readCache<Track[]>(`wave.last.${station}`) ?? [];
         const history = readCache<string[]>(WAVE_HISTORY_KEY) ?? [];
@@ -466,7 +516,6 @@ export const usePlayerStore = defineStore("player", {
 
         let tracks = dedupeTracks(fresh);
         if (!tracks.length) {
-          // Ротор отдал только уже слышанное: чистим повторы.
           const playing = this.current?.id;
           const deduped = dedupeTracks(fallback).filter(
             (t) => t.id !== playing,
@@ -484,7 +533,6 @@ export const usePlayerStore = defineStore("player", {
         if (stationName) this.stationName = stationName;
         else if (station === DEFAULT_STATION) this.stationName = "Моя волна";
         this.waveBatchId = batchId;
-        // Разные массивы: иначе добор волны пишет трек дважды.
         this.queue = [...tracks];
         this.sourceQueue = [...tracks];
         this.shuffle = false;
@@ -514,10 +562,23 @@ export const usePlayerStore = defineStore("player", {
       this.index = startIndex;
       this.isWave = opts?.wave ?? false;
       this.waveBatchId = opts?.batchId ?? null;
+      radioStarted = false;
       await this.loadCurrent();
     },
 
     async loadCurrent(opts?: { startAt?: number; autoplay?: boolean }) {
+      const ticket = ++navSeq;
+      const previous = loadChain;
+      const run = (async () => {
+        await previous.catch(() => undefined);
+        if (ticket !== navSeq) return;
+        await this.performLoad(opts);
+      })();
+      loadChain = run.catch(() => undefined);
+      await run;
+    },
+
+    async performLoad(opts?: { startAt?: number; autoplay?: boolean }) {
       const track = this.queue[this.index];
       if (!track) return;
       if (
@@ -528,7 +589,7 @@ export const usePlayerStore = defineStore("player", {
       ) {
         skipGuard += 1;
         this.index += 1;
-        await this.loadCurrent(opts);
+        await this.performLoad(opts);
         return;
       }
       skipGuard = 0;
@@ -544,22 +605,42 @@ export const usePlayerStore = defineStore("player", {
       this.loading = true;
       this.lyrics = null;
       this.lyricsError = null;
+      this.lyricsOrigin = null;
+      this.lyricsPick = null;
       const token = nextSourceToken();
       const ui = useUiStore().settings;
-      const fadeMs = ui.crossfadeEnabled
-        ? Math.round(Math.max(0, ui.crossfadeSeconds) * 1000)
-        : 0;
+      const rapid = Date.now() - lastLoadAt < 900;
+      lastLoadAt = Date.now();
+      const fadeMs =
+        ui.crossfadeEnabled && !rapid
+          ? Math.round(Math.max(0, ui.crossfadeSeconds) * 1000)
+          : 0;
+      stallAt = startAt;
+      stallSince = 0;
+      recoverStep = 0;
       try {
         if (fadeMs > 0) await fadeOut(Math.min(fadeMs, 1200));
 
         let source: string | null = null;
         this.playingLocal = false;
         this.censorReplaced = false;
+        this.censorAvailable = false;
 
-        if (ui.censorBypass) {
+        const custom = overrideUrl(track.id);
+        if (custom) {
+          source = custom;
+          this.censorReplaced = true;
+          this.currentCodec = null;
+          this.currentBitrate = null;
+          this.currentSource = "custom-replacement";
+          log.info("source from custom replacement", track.title);
+        }
+
+        if (!source && ui.censorBypass) {
           await ensureCensorList();
           const replacement = censorUrl(track.id);
-          if (replacement) {
+          this.censorAvailable = Boolean(replacement);
+          if (replacement && !prefersOriginal(track.id)) {
             source = replacement;
             this.censorReplaced = true;
             this.currentCodec = null;
@@ -627,11 +708,10 @@ export const usePlayerStore = defineStore("player", {
         }
 
         if (!isCurrentToken(token)) return;
+        const target = this.muted ? 0 : this.volume;
+        cancelFade(fadeMs > 0 && autoplay ? 0 : target);
         audio.src = source;
         audio.playbackRate = this.playbackRate;
-        const target = this.muted ? 0 : this.volume;
-        if (fadeMs > 0 && autoplay) audio.volume = 0;
-        else audio.volume = target;
         useEqualizerStore().apply();
         if (startAt > 0) {
           const seekOnce = () => {
@@ -675,6 +755,7 @@ export const usePlayerStore = defineStore("player", {
           });
           return;
         }
+        cancelFade(this.muted ? 0 : this.volume);
         Notify.create({
           type: "negative",
           message:
@@ -682,10 +763,12 @@ export const usePlayerStore = defineStore("player", {
         });
       } finally {
         this.loading = false;
+        if (isCurrentToken(token) && fadeMs === 0) {
+          cancelFade(this.muted ? 0 : this.volume);
+        }
       }
     },
 
-    /** Убирает дубли из очереди, не теряя текущий трек. */
     dedupeQueue() {
       const seen = new Set<string>();
       const cleaned: Track[] = [];
@@ -710,7 +793,6 @@ export const usePlayerStore = defineStore("player", {
 
     async prefetchNext() {
       const ui = useUiStore().settings;
-      // В волне сначала добираем треки, иначе предзагружать нечего.
       if (
         this.isWave &&
         !this.fetchingMore &&
@@ -723,7 +805,7 @@ export const usePlayerStore = defineStore("player", {
         .filter((track) => !prefetched.has(track.id));
       await Promise.all(
         targets.map(async (next) => {
-          if (ui.censorBypass) {
+          if (ui.censorBypass && !prefersOriginal(next.id)) {
             const censored = censorUrl(next.id);
             if (censored) {
               rememberPrefetch(next.id, {
@@ -774,39 +856,59 @@ export const usePlayerStore = defineStore("player", {
       );
     },
 
-    async loadLyrics() {
+    async loadLyrics(force = false, mode?: LyricsSource) {
       const track = this.current;
-      if (!track || this.lyrics?.track_id === track.id) return;
+      if (!track) return;
+      if (!force && this.lyrics?.track_id === track.id) return;
+
+      const pick = mode ?? this.lyricsPick ?? undefined;
       this.lyricsLoading = true;
       this.lyricsError = null;
 
-      const key = `lyrics.${track.id}`;
-      const cached = readCache<Lyrics>(key);
-      if (cached) {
+      const key = pick ? `lyrics.${track.id}.${pick}` : `lyrics.${track.id}`;
+      const cached = force ? null : readCache<Lyrics>(key);
+      if (hasText(cached)) {
         this.lyrics = cached;
         this.lyricsLoading = false;
+      } else {
+        this.lyrics = null;
       }
 
-      await swr<Lyrics>(key, () => api.lyrics(track.id), {
-        onData: (data) => {
-          if (this.current?.id !== track.id) return;
-          this.lyrics = data;
+      try {
+        const found = await loadTrackLyrics(track, pick, force);
+        if (this.current?.id !== track.id) return;
+        if (found) {
+          this.lyrics = found.lyrics;
+          this.lyricsOrigin = found.origin;
           this.lyricsError = null;
-        },
-        onError: () => {
-          if (this.current?.id !== track.id || this.lyrics) return;
+          writeCache(key, found.lyrics);
+        } else if (!hasText(this.lyrics)) {
           this.lyrics = null;
+          this.lyricsOrigin = null;
           this.lyricsError = "Текста для этого трека нет";
-        },
-        onSettled: () => {
-          this.lyricsLoading = false;
-        },
-      });
+        }
+      } catch {
+        if (this.current?.id !== track.id) return;
+        if (!hasText(this.lyrics)) {
+          this.lyrics = null;
+          this.lyricsOrigin = null;
+          this.lyricsError = "Не удалось загрузить текст";
+        }
+      } finally {
+        if (this.current?.id === track.id) this.lyricsLoading = false;
+      }
 
-      /* текста нет - уходим на большую обложку */
       if (this.lyricsFullscreen && !this.lyrics?.lines?.length) {
         this.openFullscreen();
       }
+    },
+
+    async setLyricsSource(mode: LyricsSource | null, force = false) {
+      if (this.lyricsPick === mode && !force) return;
+      this.lyricsPick = mode;
+      this.lyrics = null;
+      this.lyricsOrigin = null;
+      await this.loadLyrics(true, mode ?? undefined);
     },
 
     toggleLyrics() {
@@ -848,7 +950,6 @@ export const usePlayerStore = defineStore("player", {
           ? this.lyrics
           : readCache<Lyrics>(`lyrics.${track.id}`);
 
-      /* текст уже есть - сразу открываем его */
       if (ready?.lines?.length) {
         this.lyrics = ready;
         this.lyricsError = null;
@@ -858,7 +959,6 @@ export const usePlayerStore = defineStore("player", {
         return;
       }
 
-      /* текста нет или он ещё не загружен - без ожидания показываем обложку */
       this.openFullscreen();
       await this.loadLyrics();
       if (
@@ -875,11 +975,21 @@ export const usePlayerStore = defineStore("player", {
       this.lyricsFullscreen = !this.lyricsFullscreen;
     },
 
+    async useOriginalVersion(id: string, original: boolean) {
+      if (!setPrefersOriginal(id, original)) return;
+      prefetched.delete(id);
+      if (this.current?.id !== id) return;
+      const position = audio.currentTime;
+      const wasPlaying = !audio.paused;
+      await this.loadCurrent({ startAt: position, autoplay: wasPlaying });
+    },
+
     async setQuality(quality: Quality) {
       if (quality === this.quality) return;
       this.quality = quality;
       this.persist();
       if (!this.current) return;
+      if (overrideUrl(this.current.id)) return;
       const position = audio.currentTime;
       const wasPlaying = !audio.paused;
       try {
@@ -1000,24 +1110,178 @@ export const usePlayerStore = defineStore("player", {
         return;
       }
 
-      if (this.repeat === "all" && this.queue.length) {
+      const ui = useUiStore().settings;
+
+      if (
+        this.queue.length &&
+        (this.repeat === "all" || ui.repeatPlaylistAlways)
+      ) {
         this.index = 0;
         await this.loadCurrent();
         return;
       }
 
+      if (ui.autoWaveOnQueueEnd && (await this.continueWithWave())) return;
+
       this.isPlaying = false;
       audio.pause();
     },
 
+    async ensureRadioStarted() {
+      if (!this.isWave || radioStarted) return;
+      const station = this.stationId ?? DEFAULT_STATION;
+      this.stationId = station;
+      radioStarted = true;
+      await api
+        .sendFeedback({ type: "radioStarted", station_id: station })
+        .catch(() => undefined);
+    },
+
+    async armWave() {
+      if (!this.isWave) return;
+      radioStarted = false;
+      const station = this.stationId ?? DEFAULT_STATION;
+      this.stationId = station;
+      if (!this.stationName) {
+        this.stationName = station === DEFAULT_STATION ? "Моя волна" : "Волна";
+      }
+      await this.ensureRadioStarted();
+      if (this.index >= this.queue.length - 2) {
+        const added = await this.extendWave();
+        if (!added) log.warn("wave did not extend after restart", station);
+      }
+      this.waveError = null;
+      log.info("wave armed", station, this.queue.length - this.index - 1);
+    },
+
+    async rescueWave(station: string) {
+      try {
+        const res = await api.wave(undefined, station);
+        if (res.batch_id) this.waveBatchId = res.batch_id;
+        const playing = this.current?.id;
+        const all = dedupeTracks(res.tracks).filter((t) => t.id !== playing);
+        if (!all.length) return 0;
+        const inQueue = new Set(this.queue.map((t) => t.id));
+        const tail = all.filter((t) => !inQueue.has(t.id));
+        if (tail.length) {
+          this.queue.push(...tail);
+          if (this.sourceQueue !== this.queue) this.sourceQueue.push(...tail);
+          this.remember(tail);
+          this.dedupeQueue();
+          return tail.length;
+        }
+        this.queue.push(...all);
+        if (this.sourceQueue !== this.queue) this.sourceQueue.push(...all);
+        return all.length;
+      } catch (error) {
+        log.warn("rescueWave failed", error);
+        return 0;
+      }
+    },
+
+    async continueWithWave(): Promise<boolean> {
+      const ui = useUiStore().settings;
+      const seed = this.queue[this.index] ?? this.current;
+      const personal = ui.autoWaveSource === "personal" || !seed;
+      const station = personal ? DEFAULT_STATION : `track:${seed?.id}`;
+      try {
+        const res = await api.wave(undefined, station);
+        const all = dedupeTracks(res.tracks).filter((t) => t.id !== seed?.id);
+        const inQueue = new Set(this.queue.map((t) => t.id));
+        const fresh = all.filter((t) => !inQueue.has(t.id));
+        const tracks = fresh.length ? fresh : all;
+        if (!tracks.length) return false;
+
+        this.stationId = station;
+        this.stationName = personal
+          ? "Моя волна"
+          : `Волна по «${seed?.title ?? "плейлисту"}»`;
+        this.waveBatchId = res.batch_id ?? null;
+        this.isWave = true;
+        radioStarted = false;
+        await this.ensureRadioStarted();
+
+        this.queue.push(...tracks);
+        if (this.sourceQueue !== this.queue) this.sourceQueue.push(...tracks);
+        this.remember(tracks);
+        this.index += 1;
+        Notify.create({
+          message: personal
+            ? "Очередь закончилась — включаю мою волну"
+            : "Очередь закончилась — включаю волну по плейлисту",
+        });
+        log.info("queue continued with wave", station, tracks.length);
+        await this.loadCurrent();
+        return true;
+      } catch (error) {
+        log.warn("continueWithWave failed", error);
+        return false;
+      }
+    },
+
+    watchStall() {
+      if (!this.current || audio.paused || this.loading || this.pendingResume) {
+        stallAt = audio.currentTime;
+        stallSince = 0;
+        return;
+      }
+      if (Math.abs(audio.currentTime - stallAt) > 0.05) {
+        stallAt = audio.currentTime;
+        stallSince = 0;
+        recoverStep = 0;
+        return;
+      }
+      const now = Date.now();
+      if (stallSince === 0) {
+        stallSince = now;
+        return;
+      }
+      if (now - stallSince < 5000) return;
+      stallSince = now;
+      void this.recoverPlayback(audio.currentTime, false);
+    },
+
+    async recoverPlayback(at: number, hard: boolean) {
+      const now = Date.now();
+      if (now - lastRecover < 4000) return;
+      lastRecover = now;
+      const track = this.current;
+      if (!track) return;
+      const position = Number.isFinite(at) && at > 0 ? at : this.progress;
+      recoverStep = hard ? 3 : recoverStep + 1;
+      log.warn(
+        "playback stuck, recovering",
+        track.title,
+        position,
+        recoverStep,
+      );
+
+      if (recoverStep < 3) {
+        try {
+          audio.currentTime = Math.max(0, position + 0.4);
+        } catch {}
+        await safePlay().catch(() => undefined);
+        return;
+      }
+
+      recoverStep = 0;
+      prefetched.delete(track.id);
+      await this.loadCurrent({ startAt: position, autoplay: true });
+    },
+
     async extendWave() {
-      if (this.fetchingMore) return 0;
+      if (this.fetchingMore || !this.isWave) return 0;
       this.fetchingMore = true;
       let added = 0;
       try {
+        await this.ensureRadioStarted();
+        const station = this.stationId ?? DEFAULT_STATION;
         for (let attempt = 0; attempt < 4 && added === 0; attempt++) {
           const last = this.queue[this.queue.length - 1];
-          const res = await api.wave(last?.id, this.stationId ?? undefined);
+          const res = await api.wave(
+            attempt === 0 ? last?.id : undefined,
+            station,
+          );
           if (res.batch_id) this.waveBatchId = res.batch_id;
 
           const known = new Set([
@@ -1040,8 +1304,9 @@ export const usePlayerStore = defineStore("player", {
             added = fresh.length;
           }
         }
-      } catch {
-        added = 0;
+        if (added === 0) added = await this.rescueWave(station);
+      } catch (error) {
+        log.warn("extendWave failed", error);
       } finally {
         this.fetchingMore = false;
       }
@@ -1060,8 +1325,15 @@ export const usePlayerStore = defineStore("player", {
     },
 
     seek(seconds: number) {
-      audio.currentTime = seconds;
-      this.progress = seconds;
+      const limit = this.duration > 0 ? this.duration : seconds;
+      const target = Math.max(0, Math.min(seconds, limit));
+      this.progress = target;
+      lastProgress = target;
+      try {
+        audio.currentTime = target;
+      } catch {}
+      stallAt = target;
+      stallSince = 0;
       void this.syncPresence(true);
     },
 

@@ -22,10 +22,12 @@ interface LibraryState {
   likedAlbums: LikedAlbum[];
   playlists: Playlist[];
   pinned: number[];
+  hidden: number[];
   loading: boolean;
 }
 
 const PIN_KEY = "mashiro.pinned";
+const HIDE_KEY = "mashiro.hiddenPlaylists";
 const ALBUM_KEY = "mashiro.likedAlbums";
 
 function readLikedAlbums(): LikedAlbum[] {
@@ -43,15 +45,24 @@ function readLikedAlbums(): LikedAlbum[] {
   }
 }
 
-function readPinned(): number[] {
+function readKinds(key: string): number[] {
   try {
-    const raw = localStorage.getItem(PIN_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((v) => Number(v)).filter((v) => Number.isFinite(v));
   } catch {
     return [];
+  }
+}
+
+function writeKinds(key: string, kinds: number[]): boolean {
+  try {
+    localStorage.setItem(key, JSON.stringify(kinds));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -71,7 +82,8 @@ export const useLibraryStore = defineStore("library", {
     membershipLoading: false,
     likedAlbums: readLikedAlbums(),
     playlists: [],
-    pinned: readPinned(),
+    pinned: readKinds(PIN_KEY),
+    hidden: readKinds(HIDE_KEY),
     loading: false,
   }),
 
@@ -83,21 +95,30 @@ export const useLibraryStore = defineStore("library", {
     playlistsWithTrack: (s) => (trackId: string) =>
       Object.keys(s.membership)
         .map((key) => Number(key))
-        .filter((kind) =>
-          (s.membership[kind] || []).includes(String(trackId)),
-        ),
+        .filter((kind) => (s.membership[kind] || []).includes(String(trackId))),
     albumLiked: (s) => (id: string) =>
       s.likedAlbums.some((album) => album.id === String(id)),
     sortedLikedAlbums: (s) =>
       [...s.likedAlbums].sort((a, b) => (b.liked_at || 0) - (a.liked_at || 0)),
     ownPlaylists: (s) => s.playlists,
     isPinned: (s) => (kind: number | string) => s.pinned.includes(Number(kind)),
+    isHidden: (s) => (kind: number | string) => s.hidden.includes(Number(kind)),
     sortedPlaylists: (s) => {
       const rank = (kind: number) => {
         const at = s.pinned.indexOf(Number(kind));
         return at === -1 ? s.pinned.length + 1 : at;
       };
       return [...s.playlists].sort((a, b) => rank(a.kind) - rank(b.kind));
+    },
+    visiblePlaylists(s): Playlist[] {
+      return this.sortedPlaylists.filter(
+        (pl: Playlist) => !s.hidden.includes(Number(pl.kind)),
+      );
+    },
+    hiddenPlaylists(s): Playlist[] {
+      return this.sortedPlaylists.filter((pl: Playlist) =>
+        s.hidden.includes(Number(pl.kind)),
+      );
     },
   },
 
@@ -167,9 +188,7 @@ export const useLibraryStore = defineStore("library", {
       if (this.pinned.includes(id))
         this.pinned = this.pinned.filter((v) => v !== id);
       else this.pinned = [...this.pinned, id];
-      try {
-        localStorage.setItem(PIN_KEY, JSON.stringify(this.pinned));
-      } catch {
+      if (!writeKinds(PIN_KEY, this.pinned)) {
         Notify.create({
           type: "negative",
           message: "Не удалось сохранить закреплённые",
@@ -180,6 +199,31 @@ export const useLibraryStore = defineStore("library", {
         message: this.pinned.includes(id)
           ? "Закрепил плейлист"
           : "Открепил плейлист",
+      });
+    },
+
+    toggleHidden(kind: number | string) {
+      const id = Number(kind);
+      const wasHidden = this.hidden.includes(id);
+      this.hidden = wasHidden
+        ? this.hidden.filter((v) => v !== id)
+        : [...this.hidden, id];
+
+      if (!wasHidden && this.pinned.includes(id)) {
+        this.pinned = this.pinned.filter((v) => v !== id);
+        writeKinds(PIN_KEY, this.pinned);
+      }
+
+      if (!writeKinds(HIDE_KEY, this.hidden)) {
+        Notify.create({
+          type: "negative",
+          message: "Не удалось сохранить скрытые плейлисты",
+        });
+        return;
+      }
+
+      Notify.create({
+        message: wasHidden ? "Вернул плейлист в коллекцию" : "Спрятал плейлист",
       });
     },
 
@@ -232,9 +276,9 @@ export const useLibraryStore = defineStore("library", {
         await api.playlistDelete(kind);
         this.playlists = this.playlists.filter((p) => p.kind !== kind);
         this.pinned = this.pinned.filter((v) => v !== Number(kind));
-        try {
-          localStorage.setItem(PIN_KEY, JSON.stringify(this.pinned));
-        } catch {}
+        this.hidden = this.hidden.filter((v) => v !== Number(kind));
+        writeKinds(PIN_KEY, this.pinned);
+        writeKinds(HIDE_KEY, this.hidden);
         Notify.create({ message: "Удалил плейлист" });
         return true;
       } catch (e) {
@@ -287,9 +331,7 @@ export const useLibraryStore = defineStore("library", {
           ? this.dislikedIds.filter((id) => id !== String(track.id))
           : [...this.dislikedIds, String(track.id)];
         Notify.create({
-          message: already
-            ? "Снял «Не нравится»"
-            : "Отметил «Не нравится»",
+          message: already ? "Снял «Не нравится»" : "Отметил «Не нравится»",
         });
       } catch (e) {
         notifyError(e, "Не удалось отметить трек");
@@ -312,7 +354,6 @@ export const useLibraryStore = defineStore("library", {
         this.membership = next;
         this.membershipAt = Date.now();
       } catch {
-        // отсутствие данных не должно ломать меню
       } finally {
         this.membershipLoading = false;
       }
@@ -323,7 +364,10 @@ export const useLibraryStore = defineStore("library", {
       const ids = this.membership[key] || [];
       if (present) {
         if (!ids.includes(String(trackId))) {
-          this.membership = { ...this.membership, [key]: [...ids, String(trackId)] };
+          this.membership = {
+            ...this.membership,
+            [key]: [...ids, String(trackId)],
+          };
         }
         return;
       }
@@ -346,7 +390,8 @@ export const useLibraryStore = defineStore("library", {
       return ok;
     },
 
-    async addToPlaylist(kind: number, track: Track, silent = false) {      try {
+    async addToPlaylist(kind: number, track: Track, silent = false) {
+      try {
         await api.playlistAdd(kind, track.id, track.album_id || track.id, 0);
         const target = this.playlists.find((p) => p.kind === kind);
         if (target) target.track_count += 1;

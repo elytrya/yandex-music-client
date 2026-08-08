@@ -19,22 +19,7 @@
         @pointerdown="startResize('meta', $event)"
       />
 
-      <div class="pe-hint">
-        <Icon name="drag" :size="13" />
-        <span>
-          Режим редактирования: тащи кнопки между зонами, края — размеры
-        </span>
-        <button
-          type="button"
-          class="pe-btn"
-          @click.stop="ui.resetPlayerLayout()"
-        >
-          Сбросить
-        </button>
-        <button type="button" class="pe-btn accent" @click.stop="toggleEdit">
-          Готово
-        </button>
-      </div>
+      <PlayerEditor />
     </template>
     <canvas
       v-if="ui.settings.playerVisualizer"
@@ -69,6 +54,9 @@
             <span
               :key="displayTitle"
               class="ellipsis t-13 w-600 player-title-text"
+              :class="{ 'player-title-link': Boolean(trackTarget) }"
+              :title="trackTargetHint"
+              @click="openTrackSource"
             >
               {{ displayTitle }}
             </span>
@@ -79,6 +67,13 @@
             <q-tooltip>
               Оригинальный трек заменён на версию без цензуры из базы
               FckCensorData
+            </q-tooltip>
+          </span>
+          <span v-else-if="showOriginalBadge" class="censor-tag muted">
+            с цензурой
+            <q-tooltip>
+              Играет версия с Яндекс Музыки. Версию без цензуры можно вернуть в
+              меню трека.
             </q-tooltip>
           </span>
           <button
@@ -118,22 +113,23 @@
         v-if="leftButtons.length || editMode"
         class="player-zone player-zone-left"
         :data-zone-label="editMode ? 'Слева' : null"
-        @dragover.prevent
-        @drop.prevent="dropInZone('left', leftButtons.length)"
+        @dragover.prevent="onZoneOver('left', $event)"
+        @dragleave="onZoneLeave($event)"
+        @drop.prevent="onZoneDrop('left', $event)"
       >
-        <span
-          v-for="(id, index) in leftButtons"
-          :key="id"
-          class="pe-item"
-          :class="{ dragging: dragId === id }"
-          :draggable="editMode"
-          @dragstart="startDrag(id, $event)"
-          @dragend="dragId = null"
-          @dragover.prevent
-          @drop.prevent.stop="dropInZone('left', index)"
-        >
-          <PlayerButton :id="id" />
-        </span>
+        <template v-for="(id, index) in leftButtons" :key="id">
+          <i v-if="caretAt('left', index)" class="pe-caret" />
+          <span
+            class="pe-item"
+            :class="{ dragging: dragId === id }"
+            :draggable="editMode"
+            @dragstart="startDrag(id, $event)"
+            @dragend="endDrag()"
+          >
+            <PlayerButton :id="id" />
+          </span>
+        </template>
+        <i v-if="caretAt('left', leftButtons.length)" class="pe-caret" />
       </div>
     </div>
 
@@ -141,37 +137,39 @@
       <div
         class="player-controls"
         :data-zone-label="editMode ? 'Центр' : null"
-        @dragover.prevent
-        @drop.prevent="dropInZone('center', centerButtons.length)"
+        @dragover.prevent="onZoneOver('center', $event)"
+        @dragleave="onZoneLeave($event)"
+        @drop.prevent="onZoneDrop('center', $event)"
       >
-        <span
-          v-for="(id, index) in centerButtons"
-          :key="id"
-          class="pe-item"
-          :class="{ dragging: dragId === id }"
-          :draggable="editMode"
-          @dragstart="startDrag(id, $event)"
-          @dragend="dragId = null"
-          @dragover.prevent
-          @drop.prevent.stop="dropInZone('center', index)"
-        >
-          <PlayerButton :id="id" />
-        </span>
+        <template v-for="(id, index) in centerButtons" :key="id">
+          <i v-if="caretAt('center', index)" class="pe-caret" />
+          <span
+            class="pe-item"
+            :class="{ dragging: dragId === id }"
+            :draggable="editMode"
+            @dragstart="startDrag(id, $event)"
+            @dragend="endDrag()"
+          >
+            <PlayerButton :id="id" />
+          </span>
+        </template>
+        <i v-if="caretAt('center', centerButtons.length)" class="pe-caret" />
       </div>
 
       <div class="player-progress">
         <div class="faint t-11 player-time">
-          {{ formatDuration(player.progress * 1000) }}
+          {{ formatDuration(seekValue * 1000) }}
         </div>
         <q-slider
           class="col"
-          :model-value="player.progress"
+          :model-value="seekValue"
           :min="0"
           :max="Math.max(player.duration, 1)"
           :step="1"
           dense
           color="primary"
-          @update:model-value="(v) => player.seek(Number(v ?? 0))"
+          @update:model-value="onSeekInput"
+          @change="onSeekCommit"
         />
         <div class="faint t-11 player-time">
           {{ formatDuration(player.duration * 1000) }}
@@ -182,22 +180,23 @@
     <div
       class="player-right"
       :data-zone-label="editMode ? 'Справа' : null"
-      @dragover.prevent
-      @drop.prevent="dropInZone('right', rightButtons.length)"
+      @dragover.prevent="onZoneOver('right', $event)"
+      @dragleave="onZoneLeave($event)"
+      @drop.prevent="onZoneDrop('right', $event)"
     >
-      <span
-        v-for="(id, index) in rightButtons"
-        :key="id"
-        class="pe-item"
-        :class="{ dragging: dragId === id }"
-        :draggable="editMode"
-        @dragstart="startDrag(id, $event)"
-        @dragend="dragId = null"
-        @dragover.prevent
-        @drop.prevent.stop="dropInZone('right', index)"
-      >
-        <PlayerButton :id="id" />
-      </span>
+      <template v-for="(id, index) in rightButtons" :key="id">
+        <i v-if="caretAt('right', index)" class="pe-caret" />
+        <span
+          class="pe-item"
+          :class="{ dragging: dragId === id }"
+          :draggable="editMode"
+          @dragstart="startDrag(id, $event)"
+          @dragend="endDrag()"
+        >
+          <PlayerButton :id="id" />
+        </span>
+      </template>
+      <i v-if="caretAt('right', rightButtons.length)" class="pe-caret" />
     </div>
   </div>
 </template>
@@ -209,6 +208,7 @@ import ArtistsLine from "@/components/ArtistsLine.vue";
 import AiTag from "@/components/AiTag.vue";
 import Icon from "@/components/Icon.vue";
 import PlayerButton from "@/components/player/PlayerButton.vue";
+import PlayerEditor from "@/components/player/PlayerEditor.vue";
 import TrackMenu from "@/components/TrackMenu.vue";
 import { useVisualizer } from "@/composables/useVisualizer";
 import { formatDuration } from "@/lib/format";
@@ -237,6 +237,43 @@ const showCensorBadge = computed(
   () => ui.settings.censorBadge && player.censorReplaced,
 );
 
+const showOriginalBadge = computed(
+  () =>
+    ui.settings.censorBadge && !player.censorReplaced && player.censorAvailable,
+);
+
+const trackTarget = computed(() => {
+  const track = player.current;
+  if (!track) return null;
+  if (track.album_id) return `/album/${track.album_id}`;
+  const artistId = track.artists?.[0]?.id;
+  return artistId ? `/artist/${artistId}/tracks` : null;
+});
+
+const trackTargetHint = computed(() => {
+  if (!trackTarget.value) return "";
+  return player.current?.album_id
+    ? "Перейти к альбому"
+    : "Перейти к трекам артиста";
+});
+
+function openTrackSource() {
+  if (trackTarget.value) void router.push(trackTarget.value);
+}
+
+const scrubbing = ref<number | null>(null);
+const seekValue = computed(() => scrubbing.value ?? player.progress);
+
+function onSeekInput(value: number | null) {
+  scrubbing.value = Number(value ?? 0);
+}
+
+function onSeekCommit(value: number | null) {
+  const target = Number(value ?? 0);
+  scrubbing.value = null;
+  player.seek(target);
+}
+
 const handledDislike = new Set<string>();
 
 watch(
@@ -263,27 +300,77 @@ const leftButtons = computed(() => ui.playerZoneButtons("left"));
 const centerButtons = computed(() => ui.playerZoneButtons("center"));
 const rightButtons = computed(() => ui.playerZoneButtons("right"));
 
-/* --- Свободное редактирование прямо на плеере --- */
-
 const editMode = computed(() => ui.settings.playerEditMode);
 const dragId = ref<PlayerButtonId | null>(null);
+const overZone = ref<PlayerZone | null>(null);
+const overIndex = ref(-1);
 
 function toggleEdit() {
-  ui.set("playerEditMode", !ui.settings.playerEditMode);
+  ui.togglePlayerEdit();
+}
+
+function zoneList(zone: PlayerZone): PlayerButtonId[] {
+  if (zone === "left") return leftButtons.value;
+  if (zone === "center") return centerButtons.value;
+  if (zone === "right") return rightButtons.value;
+  return [];
+}
+
+function slotAt(container: HTMLElement, clientX: number): number {
+  const items = Array.from(container.querySelectorAll<HTMLElement>(".pe-item"));
+  let slot = 0;
+  for (const el of items) {
+    const box = el.getBoundingClientRect();
+    if (clientX >= box.left + box.width / 2) slot += 1;
+  }
+  return slot;
+}
+
+function caretAt(zone: PlayerZone, index: number): boolean {
+  return editMode.value && overZone.value === zone && overIndex.value === index;
 }
 
 function startDrag(id: PlayerButtonId, event: DragEvent) {
   dragId.value = id;
-  // WebView2 требует данные в dataTransfer, иначе drag не стартует.
   event.dataTransfer?.setData("text/plain", id);
   if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
 }
 
-function dropInZone(zone: PlayerZone, index: number) {
-  const id = dragId.value;
+function endDrag() {
   dragId.value = null;
+  overZone.value = null;
+  overIndex.value = -1;
+}
+
+function onZoneOver(zone: PlayerZone, event: DragEvent) {
+  if (!editMode.value) return;
+  const box = event.currentTarget as HTMLElement | null;
+  if (!box) return;
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  overZone.value = zone;
+  overIndex.value = slotAt(box, event.clientX);
+}
+
+function onZoneLeave(event: DragEvent) {
+  const box = event.currentTarget as HTMLElement | null;
+  const to = event.relatedTarget as Node | null;
+  if (box && to && box.contains(to)) return;
+  overZone.value = null;
+  overIndex.value = -1;
+}
+
+function onZoneDrop(zone: PlayerZone, event: DragEvent) {
+  const dropped = event.dataTransfer?.getData("text/plain") as
+    PlayerButtonId | undefined;
+  const id = dragId.value ?? (dropped || null);
+  const list = zoneList(zone);
+  const box = event.currentTarget as HTMLElement | null;
+  const slot = box ? slotAt(box, event.clientX) : list.length;
+  endDrag();
   if (!id) return;
-  ui.movePlayerButton(id, zone, index);
+
+  const from = list.indexOf(id);
+  ui.movePlayerButton(id, zone, from >= 0 && from < slot ? slot - 1 : slot);
 }
 
 type ResizeKind = "height" | "meta";
@@ -333,9 +420,21 @@ function openAlbum() {
   if (id) void router.push(`/album/${id}`);
 }
 
+function onGlobalKeydown(event: KeyboardEvent) {
+  if (event.key !== "Escape" || !editMode.value) return;
+  event.preventDefault();
+  event.stopPropagation();
+  ui.finishEdit();
+}
+
 onMounted(() => {
   player.bind();
   void library.init();
+  window.addEventListener("keydown", onGlobalKeydown, true);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onGlobalKeydown, true);
 });
 </script>
 
@@ -368,6 +467,17 @@ onMounted(() => {
 
 .player-edit .pe-item.dragging {
   opacity: 0.4;
+}
+
+.player-edit .pe-caret {
+  width: 2px;
+  height: 22px;
+  flex: 0 0 2px;
+  align-self: center;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent);
+  pointer-events: none;
 }
 
 .player-edit .player-zone,
@@ -450,6 +560,21 @@ onMounted(() => {
   border-color: var(--accent);
   background: var(--accent);
   color: #fff;
+}
+
+.player-title-link {
+  cursor: pointer;
+}
+
+.player-title-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.censor-tag.muted {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg-dim);
 }
 
 .censor-tag {

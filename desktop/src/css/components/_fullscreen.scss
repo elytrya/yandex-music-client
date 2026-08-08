@@ -38,7 +38,6 @@
   padding: 10px 14px;
 }
 
-/* зона перетаскивания окна */
 .fs-drag {
   align-self: stretch;
   flex: 1;
@@ -218,12 +217,11 @@
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 20px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(24, 24, 28, 0.58),
-      rgba(10, 10, 12, 0.78)
-    );
+  background: linear-gradient(
+    180deg,
+    rgba(24, 24, 28, 0.58),
+    rgba(10, 10, 12, 0.78)
+  );
   box-shadow:
     0 30px 70px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -344,7 +342,6 @@
   }
 }
 
-/* смена трека внутри полноэкранного режима */
 .fs-art .fs-swap-enter-active,
 .fs-art .fs-swap-leave-active {
   transition:

@@ -4,6 +4,7 @@ type NativeWindow = {
   setFocus?: () => Promise<void>;
   setFullscreen?: (value: boolean) => Promise<void>;
   isFullscreen?: () => Promise<boolean>;
+  setSize?: (size: unknown) => Promise<void>;
 };
 
 async function currentWindow(): Promise<NativeWindow | null> {
@@ -56,6 +57,21 @@ export async function isNativeFullscreen(): Promise<boolean> {
   if (!win?.isFullscreen) return false;
   try {
     return await win.isFullscreen();
+  } catch {
+    return false;
+  }
+}
+
+export async function setWindowSize(
+  width: number,
+  height: number,
+): Promise<boolean> {
+  const win = await currentWindow();
+  if (!win?.setSize) return false;
+  try {
+    const dpi = await import("@tauri-apps/api/dpi");
+    await win.setSize(new dpi.LogicalSize(width, height));
+    return true;
   } catch {
     return false;
   }
