@@ -1,1 +1,13 @@
-/target
+# rust / cargo build output
+/target/
+target/
+**/*.rs.bk
+*.pdb
+
+# tauri generated
+gen/schemas/
+
+# env
+.env
+.env.*
+!.env.example
