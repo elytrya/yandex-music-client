@@ -21,7 +21,7 @@
           </button>
         </div>
 
-        <template v-if="playlists.length">
+        <template v-if="visiblePlaylists.length">
           <div class="home-section-head">
             <div class="h2">Твои плейлисты</div>
             <button
@@ -35,7 +35,7 @@
           </div>
 
           <div class="row q-col-gutter-md">
-            <div v-for="pl in playlists" :key="pl.kind" class="col-auto">
+            <div v-for="pl in visiblePlaylists" :key="pl.kind" class="col-auto">
               <div
                 class="card home-card"
                 style="width: 150px"
@@ -308,6 +308,10 @@ const library = useLibraryStore();
 const playlists = ref<Playlist[]>([]);
 const wheel = ref<WheelItem[]>([]);
 const loading = ref(false);
+
+const visiblePlaylists = computed(() =>
+  playlists.value.filter((pl) => !library.isHidden(pl.kind)),
+);
 
 const waves = computed(() =>
   wheel.value.filter((item) => item.kind === "wave"),

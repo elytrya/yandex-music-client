@@ -1,47 +1,8 @@
-# dependencies
 node_modules/
-.pnp
-.pnp.js
-
-# builds / output
-dist/
-dist-ssr/
-out/
-*.local
-
-# quasar / vite
 .quasar/
-quasar.config.*.temporary.compiled*
-.vite/
-
-# rust / tauri
+dist/
+*.local
 src-tauri/target/
-src-tauri/gen/schemas/
-
-# env
 .env
-.env.*
-!.env.example
-
-# logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# caches / coverage
-.cache/
-.temp/
-coverage/
-
-# editors / ide
-.vscode/*
-!.vscode/extensions.json
-.idea/
-*.sw?
-
-# os
 .DS_Store
-Thumbs.db
-*.zip
+*.log
