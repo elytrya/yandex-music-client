@@ -1,6 +1,6 @@
 [package]
 name = "mashiro"
-version = "0.3.0"
+version = "0.1.0"
 description = "Mashiro - open-source клиент Яндекс Музыки"
 authors = ["Mashiro contributors"]
 edition = "2021"

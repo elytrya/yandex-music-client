@@ -1,4 +1,59 @@
+# dependencies
 node_modules/
-target/
+.pnp
+.pnp.js
+
+# builds / output
 dist/
+dist-ssr/
+build/
+out/
+target/
+
+# quasar / vite
+.quasar/
+quasar.config.*.temporary.compiled*
+*.local
+
+# rust / tauri
+debug/
+**/*.rs.bk
+*.pdb
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# caches / coverage
+.cache/
+.temp/
+coverage/
+
+# editors / ide
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# os
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# misc
 patches/
