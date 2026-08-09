@@ -50,6 +50,7 @@ import LyricsSection from "@/components/settings/sections/LyricsSection.vue";
 import MiniPlayerSection from "@/components/settings/sections/MiniPlayerSection.vue";
 import PlayerSection from "@/components/settings/sections/PlayerSection.vue";
 import PlaylistToolsSection from "@/components/settings/sections/PlaylistToolsSection.vue";
+import TogetherSection from "@/components/settings/sections/TogetherSection.vue";
 import { useEqualizerStore } from "@/stores/equalizer";
 import { usePlayerStore } from "@/stores/player/index";
 import { useUiStore } from "@/stores/ui/index";
@@ -91,6 +92,12 @@ const sections = [
     label: "Плейлисты",
     icon: "library",
     component: PlaylistToolsSection,
+  },
+  {
+    id: "together",
+    label: "Слушать вместе",
+    icon: "person",
+    component: TogetherSection,
   },
   {
     id: "hotkeys",
