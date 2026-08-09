@@ -57,7 +57,7 @@ mod tests {
         let raw = [9u8, 8, 7, 6, 5, 4];
         let text = to_base32(&raw);
         assert_eq!(text.len(), 10);
-        let noisy = format!("{}-{}", &text[..5].to_uppercase(), &text[5..]);
+        let noisy = format!("{}-{}", text[..5].to_uppercase(), &text[5..]);
         assert_eq!(from_base32(&noisy).as_deref(), Some(&raw[..]));
     }
 
