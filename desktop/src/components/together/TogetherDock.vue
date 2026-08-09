@@ -1,6 +1,20 @@
 <template>
-  <div v-if="together.active" class="together-dock" :class="{ open }">
-    <button class="together-dock-head" type="button" @click="toggle">
+  <div
+    v-if="together.active"
+    ref="root"
+    class="together-dock"
+    :class="{ open, dragging }"
+    :style="style"
+  >
+    <div
+      class="together-dock-head"
+      @pointerdown="onDown"
+      @pointermove="onMove"
+      @pointerup="onUp"
+      @pointercancel="onCancel"
+    >
+      <Icon class="together-dock-grip" name="drag" :size="12" />
+
       <span class="together-dock-dot" :class="{ wait: waiting }" />
 
       <span class="together-dock-title">
@@ -9,13 +23,29 @@
 
       <span class="together-dock-count">{{ together.peers.length }}</span>
       <Icon :name="open ? 'minimize' : 'expand'" :size="12" />
-    </button>
+    </div>
 
     <div v-if="open" class="together-dock-body">
       <div v-if="together.isHost" class="together-dock-row">
         <span class="together-dock-label">Адрес</span>
-        <code>{{ together.invite || `ваш-ip:${together.port}` }}</code>
-        <button class="together-dock-icon" type="button" @click="copyInvite">
+
+        <code>{{ shown ? invite : "•".repeat(12) }}</code>
+
+        <button
+          class="together-dock-icon"
+          type="button"
+          :title="shown ? 'Скрыть адрес' : 'Показать адрес'"
+          @click="shown = !shown"
+        >
+          <Icon :name="shown ? 'eyeOff' : 'eye'" :size="12" />
+        </button>
+
+        <button
+          class="together-dock-icon"
+          type="button"
+          title="Скопировать адрес"
+          @click="copyInvite"
+        >
           <Icon name="copy" :size="12" />
         </button>
       </div>
@@ -45,6 +75,7 @@
 
       <div class="together-dock-actions">
         <button type="button" @click="openSettings">Настройки</button>
+        <button type="button" @click="resetPlace">На место</button>
         <button
           type="button"
           class="danger"
@@ -59,25 +90,45 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { Notify } from "quasar";
 import Icon from "@/components/Icon.vue";
 import TogetherPeers from "@/components/together/TogetherPeers.vue";
 import { usePlayerStore } from "@/stores/player/index";
 import { useTogetherStore } from "@/stores/together/index";
-import { DOCK_KEY } from "@/stores/together/protocol";
+import { DOCK_KEY, DOCK_POS_KEY } from "@/stores/together/protocol";
+import { clampPlace, loadPlace, savePlace } from "@/lib/dock-place";
 
 const router = useRouter();
 const together = useTogetherStore();
 const player = usePlayerStore();
 
+const root = ref<HTMLElement | null>(null);
 const open = ref(false);
+const shown = ref(false);
+const dragging = ref(false);
+const place = ref(loadPlace(DOCK_POS_KEY));
+
+let from = { x: 0, y: 0, left: 0, top: 0 };
+let moved = false;
 
 const waiting = computed(() => together.waiting.length > 0);
+const invite = computed(() => together.invite || `ваш-ip:${together.port}`);
 
 const nowPlaying = computed(() =>
   player.current ? player.current.title : "ничего не играет",
+);
+
+const style = computed(() =>
+  place.value
+    ? {
+        left: `${place.value.x}px`,
+        top: `${place.value.y}px`,
+        right: "auto",
+        bottom: "auto",
+      }
+    : undefined,
 );
 
 onMounted(() => {
@@ -85,13 +136,66 @@ onMounted(() => {
   try {
     open.value = localStorage.getItem(DOCK_KEY) === "1";
   } catch {}
+  window.addEventListener("resize", keepInside);
 });
+
+onBeforeUnmount(() => window.removeEventListener("resize", keepInside));
 
 function toggle() {
   open.value = !open.value;
   try {
     localStorage.setItem(DOCK_KEY, open.value ? "1" : "0");
   } catch {}
+}
+
+function onDown(event: PointerEvent) {
+  if (event.button !== 0) return;
+  const box = root.value?.getBoundingClientRect();
+  if (!box) return;
+
+  dragging.value = true;
+  moved = false;
+  from = { x: event.clientX, y: event.clientY, left: box.left, top: box.top };
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+}
+
+function onMove(event: PointerEvent) {
+  if (!dragging.value) return;
+
+  const dx = event.clientX - from.x;
+  const dy = event.clientY - from.y;
+  if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+
+  moved = true;
+  place.value = clampPlace({ x: from.left + dx, y: from.top + dy }, root.value);
+}
+
+function onUp(event: PointerEvent) {
+  if (!dragging.value) return;
+
+  dragging.value = false;
+  (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+
+  if (!moved) {
+    toggle();
+    return;
+  }
+  savePlace(DOCK_POS_KEY, place.value);
+}
+
+function onCancel() {
+  dragging.value = false;
+}
+
+function keepInside() {
+  if (!place.value) return;
+  place.value = clampPlace(place.value, root.value);
+  savePlace(DOCK_POS_KEY, place.value);
+}
+
+function resetPlace() {
+  place.value = null;
+  savePlace(DOCK_POS_KEY, null);
 }
 
 async function copyInvite() {
@@ -127,22 +231,34 @@ function openSettings() {
   width: 320px;
 }
 
+.together-dock.dragging {
+  box-shadow: 0 24px 60px var(--shadow-strong);
+  opacity: 0.96;
+}
+
 .together-dock-head {
   display: flex;
   width: 100%;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border: 0;
-  background: transparent;
   color: var(--fg);
-  font: inherit;
   font-size: 13px;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+}
+
+.together-dock.dragging .together-dock-head {
+  cursor: grabbing;
 }
 
 .together-dock-head:hover {
   background: var(--hover);
+}
+
+.together-dock-grip {
+  flex: 0 0 auto;
+  color: var(--fg-faint);
 }
 
 .together-dock-dot {
@@ -245,7 +361,7 @@ function openSettings() {
 
 .together-dock-actions button {
   flex: 1 1 0;
-  padding: 7px 10px;
+  padding: 7px 8px;
   border: 1px solid var(--line);
   border-radius: calc(var(--radius) * 0.7);
   background: var(--surface-2);
