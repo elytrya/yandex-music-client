@@ -39,4 +39,6 @@ export const togetherApi = {
   send: (payload: unknown) => call<void>("together_send", { payload }),
 
   status: () => call<TogetherStatus>("together_status"),
+
+  logPath: () => call<string>("together_log_path"),
 };

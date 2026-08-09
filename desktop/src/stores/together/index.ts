@@ -18,6 +18,8 @@ import {
   loadNick,
   saveNick,
 } from "./protocol";
+import type { TogetherLogEvent } from "./log";
+import { append, formatEvent, formatLocal } from "./log";
 import { applyState, buildState } from "./sync";
 
 const unlisteners: UnlistenFn[] = [];
@@ -37,6 +39,8 @@ interface TogetherState {
   busy: boolean;
   error: string | null;
   ready: boolean;
+  log: string[];
+  logPath: string;
 }
 
 function reason(e: unknown, fallback: string): string {
@@ -53,6 +57,8 @@ export const useTogetherStore = defineStore("together", {
     busy: false,
     error: null,
     ready: false,
+    log: [],
+    logPath: "",
   }),
 
   getters: {
@@ -74,15 +80,31 @@ export const useTogetherStore = defineStore("together", {
           void this.receive(event.payload);
         }),
         await listen("together://joined", () => this.push()),
+        await listen<TogetherLogEvent>("together://log", (event) => {
+          this.note(formatEvent(event.payload));
+        }),
         await listen<{ reason: string }>("together://closed", (event) => {
           this.stopTimer();
+          this.note(formatLocal("ui", event.payload.reason));
           Notify.create({ message: event.payload.reason });
         }),
       );
 
       try {
         this.apply(await togetherApi.status());
-      } catch {}
+        this.logPath = await togetherApi.logPath();
+      } catch (e) {
+        this.note(formatLocal("ui", reason(e, "ядро не ответило")));
+      }
+    },
+
+    note(line: string) {
+      this.log = append(this.log, line);
+      console.debug(`[together] ${line}`);
+    },
+
+    clearLog() {
+      this.log = [];
     },
 
     apply(status: TogetherStatus) {
@@ -104,6 +126,7 @@ export const useTogetherStore = defineStore("together", {
         Notify.create({ message: "Комната создана" });
       } catch (e) {
         this.error = reason(e, "Не удалось создать комнату");
+        this.note(formatLocal("ui", this.error));
       } finally {
         this.busy = false;
       }
@@ -118,6 +141,7 @@ export const useTogetherStore = defineStore("together", {
         Notify.create({ message: "Подключились к комнате" });
       } catch (e) {
         this.error = reason(e, "Не удалось подключиться");
+        this.note(formatLocal("ui", this.error));
       } finally {
         this.busy = false;
       }
@@ -129,6 +153,7 @@ export const useTogetherStore = defineStore("together", {
         this.apply(await togetherApi.leave());
       } catch (e) {
         this.error = reason(e, "Не удалось отключиться");
+        this.note(formatLocal("ui", this.error));
       } finally {
         this.busy = false;
       }
@@ -142,7 +167,13 @@ export const useTogetherStore = defineStore("together", {
     push() {
       if (this.mode !== "host") return;
       lastSent = Date.now();
-      void togetherApi.send(buildState(usePlayerStore())).catch(() => {});
+      void togetherApi
+        .send(buildState(usePlayerStore()))
+        .catch((e: unknown) => {
+          this.note(
+            formatLocal("ui", reason(e, "не удалось отправить состояние")),
+          );
+        });
     },
 
     async receive(message: TogetherMessage) {
@@ -156,6 +187,7 @@ export const useTogetherStore = defineStore("together", {
         await applyState(usePlayerStore(), payload);
       } catch (e) {
         this.error = reason(e, "Не удалось синхронизироваться");
+        this.note(formatLocal("ui", this.error));
       } finally {
         applying = false;
       }

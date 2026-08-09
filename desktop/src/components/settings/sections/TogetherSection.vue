@@ -38,6 +38,8 @@
     </div>
 
     <p v-if="together.error" class="together-error">{{ together.error }}</p>
+
+    <TogetherLog />
   </section>
 </template>
 
@@ -45,6 +47,7 @@
 import { onMounted } from "vue";
 import TogetherHostCard from "@/components/together/TogetherHostCard.vue";
 import TogetherJoinCard from "@/components/together/TogetherJoinCard.vue";
+import TogetherLog from "@/components/together/TogetherLog.vue";
 import TogetherPeers from "@/components/together/TogetherPeers.vue";
 import { useTogetherStore } from "@/stores/together/index";
 
