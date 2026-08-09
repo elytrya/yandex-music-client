@@ -16,7 +16,7 @@ export const RESEND_MS = 5000;
 // склейка частых изменений в одну отправку
 export const PUSH_DEBOUNCE = 80;
 // сколько ждём подтверждение своей команды, прежде чем снова слушать хоста
-export const CONTROL_GRACE = 1800;
+export const CONTROL_GRACE = 8000;
 // сколько треков очереди уезжает в комнату вместе с состоянием
 export const QUEUE_LIMIT = 120;
 
@@ -32,6 +32,10 @@ export interface StatePayload {
   track: Track | null;
   queue: Track[];
   index: number;
+  // номер команды участника с правами
+  cmd?: number;
+  // номер команды, которую хост уже принял
+  ack?: number;
 }
 
 export interface ReadyPayload {

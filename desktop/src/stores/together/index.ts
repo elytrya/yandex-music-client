@@ -42,6 +42,9 @@ let lastApplied: StatePayload | null = null;
 let lastReady: boolean | null = null;
 let pending: StatePayload | null = null;
 let pendingAt = 0;
+// номер своей команды и последняя команда, принятая хостом
+let cmdSeq = 0;
+let lastAck: number | null = null;
 
 interface TogetherState {
   mode: TogetherMode;
@@ -159,6 +162,7 @@ export const useTogetherStore = defineStore("together", {
         lastApplied = null;
         lastReady = null;
         pending = null;
+        lastAck = null;
         holding = false;
         resumeAfterWait = false;
         this.stopTimer();
@@ -228,8 +232,13 @@ export const useTogetherStore = defineStore("together", {
     /** @param full вместе с очередью или только позиция и текущий трек */
     push(full = true) {
       if (this.mode !== "host") return;
+
+      const state = buildState(usePlayerStore(), full);
+      // подтверждаем последнюю принятую команду, чтобы её автор не откатился
+      if (lastAck !== null) state.ack = lastAck;
+
       lastSent = Date.now();
-      this.send(buildState(usePlayerStore(), full));
+      this.send(state);
     },
 
     /** Локальное действие пользователя: сразу в сеть, без ожидания тика. */
@@ -260,6 +269,9 @@ export const useTogetherStore = defineStore("together", {
 
         if (same) return;
       }
+
+      cmdSeq += 1;
+      state.cmd = cmdSeq;
 
       pending = state;
       pendingAt = Date.now();
@@ -401,6 +413,8 @@ export const useTogetherStore = defineStore("together", {
         this.note(formatLocal("ui", `команда от ${nick} не вышла: ${failed}`));
       } finally {
         applying = false;
+        // даже неудачную команду отмечаем принятой: автор не будет ждать впустую
+        if (payload.cmd !== undefined) lastAck = payload.cmd;
       }
 
       // чтобы человек не гадал, почему его трек откатился назад
@@ -411,8 +425,13 @@ export const useTogetherStore = defineStore("together", {
     async follow(payload: StatePayload) {
       // пока хост не подтвердил мою команду, его старое состояние игнорируется,
       // иначе включённый трек тут же откатится назад
-      if (pending && Date.now() - pendingAt < CONTROL_GRACE) {
-        if (payload.trackId !== pending.trackId) return;
+      if (pending) {
+        const acked =
+          pending.cmd !== undefined && payload.ack !== undefined
+            ? payload.ack >= pending.cmd
+            : payload.trackId === pending.trackId;
+
+        if (!acked && Date.now() - pendingAt < CONTROL_GRACE) return;
         pending = null;
       }
 
