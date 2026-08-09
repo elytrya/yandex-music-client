@@ -106,10 +106,11 @@ import {
 
 const ADDRESS_KEY = 'mashiro.together.server'
 const NICK_KEY = 'mashiro.together.nick'
+const DEFAULT_SERVER = 'mashiro.onecorporation.cfd'
 
 const quasar = useQuasar()
 
-const address = ref(localStorage.getItem(ADDRESS_KEY) ?? '')
+const address = ref(localStorage.getItem(ADDRESS_KEY) || DEFAULT_SERVER)
 const nick = ref(localStorage.getItem(NICK_KEY) ?? '')
 const invite = ref('')
 const phrase = ref('')
@@ -165,8 +166,16 @@ async function dropSeed() {
   notify('Сид-фраза удалена')
 }
 
+async function ensureSeed() {
+  if (hasSeed.value) return
+  phrase.value = await seedNew(12)
+  hasSeed.value = true
+  notify('Создана сид-фраза для этого устройства')
+}
+
 async function create() {
   remember()
+  await ensureSeed()
   const result = await createRoom(address.value, nick.value, invite.value || undefined)
   if (result) {
     invite.value = result.invite
@@ -176,6 +185,7 @@ async function create() {
 
 async function join() {
   remember()
+  await ensureSeed()
   await joinRoom(address.value, nick.value, invite.value)
 }
 

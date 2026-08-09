@@ -25,8 +25,38 @@
       />
     </div>
 
-    <TogetherHostCard />
-    <TogetherJoinCard />
+    <div class="setting-row">
+      <div class="setting-copy">
+        <b>Как подключаемся</b>
+        <span>Локально по сети или VPN, либо через сервер-ретранслятор без проброса портов.</span>
+      </div>
+
+      <div class="together-transport">
+        <button
+          type="button"
+          :class="{ active: transport === 'local' }"
+          :disabled="together.active"
+          @click="setTransport('local')"
+        >
+          Локально
+        </button>
+        <button
+          type="button"
+          :class="{ active: transport === 'server' }"
+          :disabled="together.active"
+          @click="setTransport('server')"
+        >
+          Через сервер
+        </button>
+      </div>
+    </div>
+
+    <template v-if="transport === 'local'">
+      <TogetherHostCard />
+      <TogetherJoinCard />
+    </template>
+
+    <TogetherServerCard v-else />
 
     <div v-if="together.active" class="setting-row column">
       <div class="setting-copy">
@@ -38,6 +68,7 @@
         :peers="together.peers"
         :waiting="together.waiting"
         :manage="together.isHost"
+        :host-id="together.hostId"
         @handoff="together.handoff"
       />
 
@@ -63,14 +94,36 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import TogetherHostCard from "@/components/together/TogetherHostCard.vue";
 import TogetherJoinCard from "@/components/together/TogetherJoinCard.vue";
+import TogetherServerCard from "@/components/together/TogetherServerCard.vue";
 import TogetherLog from "@/components/together/TogetherLog.vue";
 import TogetherPeers from "@/components/together/TogetherPeers.vue";
 import { useTogetherStore } from "@/stores/together/index";
+import { TRANSPORT_KEY } from "@/stores/together/protocol";
 
 const together = useTogetherStore();
+
+type Transport = "local" | "server";
+
+function loadTransport(): Transport {
+  try {
+    return localStorage.getItem(TRANSPORT_KEY) === "local" ? "local" : "server";
+  } catch {
+    return "server";
+  }
+}
+
+const transport = ref<Transport>(loadTransport());
+
+function setTransport(next: Transport) {
+  if (together.active) return;
+  transport.value = next;
+  try {
+    localStorage.setItem(TRANSPORT_KEY, next);
+  } catch {}
+}
 
 onMounted(() => {
   void together.init();
@@ -90,6 +143,31 @@ function onNick(event: Event) {
   background: transparent;
   color: inherit;
   font: inherit;
+}
+
+.together-transport {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.together-transport button {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.together-transport button.active {
+  background: var(--surface-2, rgba(255, 255, 255, 0.08));
+  border-color: var(--accent, #ffcc00);
+}
+
+.together-transport button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .setting-row.column {
