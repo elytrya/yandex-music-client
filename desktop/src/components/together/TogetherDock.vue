@@ -67,9 +67,8 @@
       <TogetherPeers
         :peers="together.peers"
         :waiting="together.waiting"
-        :controllers="together.controllers"
         :manage="together.isHost"
-        @grant="together.grant"
+        @handoff="together.handoff"
       />
 
       <p v-if="together.waitingNicks.length" class="together-dock-wait">
@@ -77,9 +76,7 @@
       </p>
 
       <p v-else-if="!together.isHost" class="together-dock-hint">
-        {{
-          together.rights ? "У вас есть управление комнатой" : "Управляет хост"
-        }}
+        Ведёт {{ together.hostNick }}, плеер повторяет за ним
       </p>
 
       <div class="together-dock-actions">

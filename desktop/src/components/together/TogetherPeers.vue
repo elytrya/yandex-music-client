@@ -4,16 +4,16 @@
       <span>{{ peer.nick }}</span>
 
       <b v-if="peer.id === 0">ведёт</b>
-      <b v-else-if="controllers.includes(peer.id)">управляет</b>
       <i v-if="waiting.includes(peer.id)">грузит</i>
 
       <button
         v-if="manage && peer.id !== 0"
-        class="together-grant"
+        class="together-give"
         type="button"
-        @click="emit('grant', peer.id)"
+        title="Участник станет хостом, остальные переподключатся"
+        @click="emit('handoff', peer.id)"
       >
-        {{ controllers.includes(peer.id) ? "забрать" : "дать управление" }}
+        передать хост
       </button>
     </div>
 
@@ -28,17 +28,15 @@ withDefaults(
   defineProps<{
     peers: TogetherPeer[];
     waiting?: number[];
-    controllers?: number[];
     manage?: boolean;
   }>(),
   {
     waiting: () => [],
-    controllers: () => [],
     manage: false,
   },
 );
 
-const emit = defineEmits<{ (e: "grant", id: number): void }>();
+const emit = defineEmits<{ (e: "handoff", id: number): void }>();
 </script>
 
 <style scoped>
@@ -73,7 +71,7 @@ const emit = defineEmits<{ (e: "grant", id: number): void }>();
   color: var(--accent, #ffcc00);
 }
 
-.together-grant {
+.together-give {
   padding: 0;
   border: 0;
   background: transparent;
@@ -85,7 +83,7 @@ const emit = defineEmits<{ (e: "grant", id: number): void }>();
   text-decoration: underline;
 }
 
-.together-grant:hover {
+.together-give:hover {
   opacity: 0.9;
 }
 

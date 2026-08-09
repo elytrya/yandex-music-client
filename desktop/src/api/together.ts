@@ -40,5 +40,9 @@ export const togetherApi = {
 
   status: () => call<TogetherStatus>("together_status"),
 
+  // адрес участника глазами хоста: нужен для передачи комнаты
+  peerAddress: (id: number) =>
+    call<string | null>("together_peer_address", { id }),
+
   logPath: () => call<string>("together_log_path"),
 };

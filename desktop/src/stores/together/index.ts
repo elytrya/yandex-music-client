@@ -9,26 +9,26 @@ import type {
   TogetherPeer,
   TogetherStatus,
 } from "@/api/together";
+import { askConfirm } from "@/lib/dialogs";
 import { usePlayerStore } from "@/stores/player/index";
-import type {
-  StatePayload,
-  TogetherMessage,
-  TogetherPayload,
-} from "./protocol";
+import type { TogetherMessage, TogetherPayload } from "./protocol";
 import {
-  CONTROL_GRACE,
   DEFAULT_PORT,
+  HANDOFF_DELAY,
+  HANDOFF_WINDOW,
   HEARTBEAT_MS,
-  JUMP_LIMIT,
   RESEND_MS,
   loadNick,
   saveNick,
 } from "./protocol";
 import type { TogetherLogEvent } from "./log";
 import { append, formatEvent, formatLocal } from "./log";
-import { keepAlive, nicksOf, toggleId, withId } from "./roster";
-import { applyState, buildState, expectedPosition } from "./sync";
+import { reconnect, wait } from "./handoff";
+import { keepAlive, nicksOf, withId } from "./roster";
+import { applyState, buildState } from "./sync";
 import { watchPlayer } from "./watch";
+
+const HOST_ID = 0;
 
 const unlisteners: UnlistenFn[] = [];
 let stops: WatchStopHandle[] = [];
@@ -38,13 +38,9 @@ let lastSent = 0;
 let applying = false;
 let holding = false;
 let resumeAfterWait = false;
-let lastApplied: StatePayload | null = null;
 let lastReady: boolean | null = null;
-let pending: StatePayload | null = null;
-let pendingAt = 0;
-// номер своей команды и последняя команда, принятая хостом
-let cmdSeq = 0;
-let lastAck: number | null = null;
+// когда начался переезд комнаты: в это окно разрыв связи ожидаем
+let handoffAt = 0;
 
 interface TogetherState {
   mode: TogetherMode;
@@ -54,8 +50,6 @@ interface TogetherState {
   selfId: number;
   peers: TogetherPeer[];
   waiting: number[];
-  controllers: number[];
-  rights: boolean;
   busy: boolean;
   error: string | null;
   ready: boolean;
@@ -76,8 +70,6 @@ export const useTogetherStore = defineStore("together", {
     selfId: 0,
     peers: [],
     waiting: [],
-    controllers: [],
-    rights: false,
     busy: false,
     error: null,
     ready: false,
@@ -89,9 +81,9 @@ export const useTogetherStore = defineStore("together", {
     active: (s) => s.mode !== "off",
     isHost: (s) => s.mode === "host",
     invite: (s) => (s.address ? `${s.address}:${s.port}` : ""),
-    canControl: (s) => s.mode === "host" || (s.mode === "guest" && s.rights),
     waitingNicks: (s) => nicksOf(s.waiting, s.peers),
-    hostNick: (s) => s.peers.find((peer) => peer.id === 0)?.nick ?? "хост",
+    hostNick: (s) =>
+      s.peers.find((peer) => peer.id === HOST_ID)?.nick ?? "хост",
   },
 
   actions: {
@@ -106,16 +98,15 @@ export const useTogetherStore = defineStore("together", {
         await listen<TogetherMessage>("together://message", (event) => {
           void this.receive(event.payload);
         }),
-        await listen("together://joined", () => {
-          this.push();
-          this.shareRights();
-        }),
+        await listen("together://joined", () => this.push()),
         await listen<TogetherLogEvent>("together://log", (event) => {
           this.note(formatEvent(event.payload));
         }),
         await listen<{ reason: string }>("together://closed", (event) => {
           this.stopTimer();
           this.note(formatLocal("ui", event.payload.reason));
+          // во время передачи хоста разрыв — норма, не пугаем человека
+          if (Date.now() - handoffAt < HANDOFF_WINDOW) return;
           Notify.create({ message: event.payload.reason });
         }),
       );
@@ -153,16 +144,10 @@ export const useTogetherStore = defineStore("together", {
       if (status.nick) this.nick = status.nick;
 
       this.waiting = keepAlive(this.waiting, status.peers);
-      this.controllers = keepAlive(this.controllers, status.peers);
 
       if (status.mode === "off") {
         this.waiting = [];
-        this.controllers = [];
-        this.rights = false;
-        lastApplied = null;
         lastReady = null;
-        pending = null;
-        lastAck = null;
         holding = false;
         resumeAfterWait = false;
         this.stopTimer();
@@ -233,73 +218,100 @@ export const useTogetherStore = defineStore("together", {
     push(full = true) {
       if (this.mode !== "host") return;
 
-      const state = buildState(usePlayerStore(), full);
-      // подтверждаем последнюю принятую команду, чтобы её автор не откатился
-      if (lastAck !== null) state.ack = lastAck;
-
       lastSent = Date.now();
-      this.send(state);
+      this.send(buildState(usePlayerStore(), full));
     },
 
-    /** Локальное действие пользователя: сразу в сеть, без ожидания тика. */
+    /** Локальное действие хоста: сразу в сеть, без ожидания тика. */
     onLocalChange(why: string) {
-      if (applying) return;
+      if (applying || this.mode !== "host") return;
 
-      if (this.mode === "host") {
-        this.push();
-        this.note(formatLocal("ui", `${why}: разослал комнате`));
+      this.push();
+      this.note(formatLocal("ui", `${why}: разослал комнате`));
+    },
+
+    /** Хост отдаёт комнату участнику: теперь ведёт он, остальные переезжают. */
+    async handoff(id: number) {
+      if (this.mode !== "host" || id === HOST_ID || this.busy) return;
+
+      const peer = this.peers.find((item) => item.id === id);
+      if (!peer) return;
+
+      const ok = await askConfirm({
+        title: `Передать комнату: ${peer.nick}?`,
+        message:
+          "Участник станет хостом и будет вести плеер. Остальные, включая вас, переподключатся к нему автоматически.",
+        okLabel: "Передать",
+      });
+      if (!ok) return;
+
+      let address: string | null = null;
+      try {
+        address = await togetherApi.peerAddress(id);
+      } catch (e) {
+        this.note(formatLocal("ui", reason(e, "адрес участника не узнать")));
+      }
+
+      if (!address) {
+        this.error = `Не видно адреса участника ${peer.nick}`;
+        Notify.create({ message: this.error });
         return;
       }
 
-      if (this.mode === "guest" && this.rights) this.pushControl(why);
+      const target = `${address}:${this.port}`;
+      handoffAt = Date.now();
+
+      this.send({
+        kind: "handoff",
+        to: id,
+        nick: peer.nick,
+        address,
+        port: this.port,
+      });
+      this.note(formatLocal("ui", `передаю комнату: ${peer.nick} (${target})`));
+      Notify.create({ message: `Комната переезжает к ${peer.nick}` });
+
+      // даём сообщению уйти в сеть и только потом гасим свою комнату
+      await wait(HANDOFF_DELAY / 2);
+      await this.leave();
+      await wait(HANDOFF_DELAY);
+      await this.follow(target);
     },
 
-    pushControl(why: string) {
-      const state = buildState(usePlayerStore());
-      if (!state.trackId) return;
+    /** Участник принимает комнату на себя. */
+    async takeOver(port: number) {
+      handoffAt = Date.now();
 
-      if (lastApplied) {
-        const drift = Math.abs(
-          state.positionMs / 1000 - expectedPosition(lastApplied),
-        );
-        const same =
-          state.trackId === lastApplied.trackId &&
-          state.paused === lastApplied.paused &&
-          drift <= JUMP_LIMIT;
+      await this.leave();
+      await wait(200);
+      await this.host(port);
 
-        if (same) return;
+      if (this.mode !== "host") {
+        this.error = "Не удалось поднять комнату у себя";
+        Notify.create({ message: this.error });
+        return;
       }
 
-      cmdSeq += 1;
-      state.cmd = cmdSeq;
-
-      pending = state;
-      pendingAt = Date.now();
-      lastApplied = state;
-
-      this.send(state);
-      this.note(formatLocal("ui", `${why}: команда хосту`));
+      this.note(formatLocal("ui", "комната теперь у нас"));
+      this.push();
     },
 
-    grant(id: number) {
-      if (this.mode !== "host" || id === 0) return;
+    /** Переезд к новому хосту с несколькими попытками. */
+    async follow(target: string) {
+      const done = await reconnect(target, {
+        join: (address) => this.join(address),
+        joined: () => this.mode === "guest",
+        note: (text) => this.note(formatLocal("ui", text)),
+      });
 
-      this.controllers = toggleId(this.controllers, id);
-      const nick = this.peers.find((peer) => peer.id === id)?.nick ?? `#${id}`;
-      const allowed = this.controllers.includes(id);
+      if (done) {
+        this.error = null;
+        return;
+      }
 
-      this.note(
-        formatLocal(
-          "ui",
-          allowed ? `${nick} может управлять` : `${nick} больше не управляет`,
-        ),
-      );
-      this.shareRights();
-    },
-
-    shareRights() {
-      if (this.mode !== "host") return;
-      this.send({ kind: "rights", ids: [...this.controllers] });
+      this.error = `Не удалось подключиться к новому хосту (${target})`;
+      this.note(formatLocal("ui", this.error));
+      Notify.create({ message: this.error });
     },
 
     reportReady(ready: boolean) {
@@ -360,80 +372,24 @@ export const useTogetherStore = defineStore("together", {
         return;
       }
 
+      if (payload.kind === "handoff") {
+        await this.onHandoff(
+          payload.to,
+          payload.nick,
+          payload.address,
+          payload.port,
+        );
+        return;
+      }
+
       if (payload.kind === "ready") {
         if (this.mode !== "host") return;
         this.setWaiting(message.from, !payload.ready, message.nick);
         return;
       }
 
-      if (payload.kind === "rights") {
-        if (this.mode !== "guest") return;
-
-        const allowed = payload.ids.includes(this.selfId);
-        if (allowed === this.rights) return;
-
-        this.rights = allowed;
-        this.note(
-          formatLocal(
-            "ui",
-            allowed ? "хост выдал управление" : "хост забрал управление",
-          ),
-        );
-        Notify.create({
-          message: allowed
-            ? "Хост выдал вам управление"
-            : "Управление вернулось хосту",
-        });
-        return;
-      }
-
       if (payload.kind !== "state" || applying) return;
-
-      if (this.mode === "host") {
-        if (!this.controllers.includes(message.from)) return;
-        await this.adopt(payload, message.nick);
-        return;
-      }
-
-      if (this.mode === "guest") await this.follow(payload);
-    },
-
-    /** Хост выполняет команду участника с правами и сразу раздаёт её всем. */
-    async adopt(payload: StatePayload, nick: string) {
-      applying = true;
-      let failed: string | null = null;
-      try {
-        await applyState(usePlayerStore(), payload);
-        this.note(
-          formatLocal("ui", `команда от ${nick}: ${payload.title ?? "трек"}`),
-        );
-      } catch (e) {
-        failed = reason(e, "не удалось включить трек");
-        this.error = failed;
-        this.note(formatLocal("ui", `команда от ${nick} не вышла: ${failed}`));
-      } finally {
-        applying = false;
-        // даже неудачную команду отмечаем принятой: автор не будет ждать впустую
-        if (payload.cmd !== undefined) lastAck = payload.cmd;
-      }
-
-      // чтобы человек не гадал, почему его трек откатился назад
-      if (failed) this.send({ kind: "note", text: failed });
-      this.push();
-    },
-
-    async follow(payload: StatePayload) {
-      // пока хост не подтвердил мою команду, его старое состояние игнорируется,
-      // иначе включённый трек тут же откатится назад
-      if (pending) {
-        const acked =
-          pending.cmd !== undefined && payload.ack !== undefined
-            ? payload.ack >= pending.cmd
-            : payload.trackId === pending.trackId;
-
-        if (!acked && Date.now() - pendingAt < CONTROL_GRACE) return;
-        pending = null;
-      }
+      if (this.mode !== "guest") return;
 
       const player = usePlayerStore();
       if (payload.trackId && payload.trackId !== player.current?.id) {
@@ -443,7 +399,6 @@ export const useTogetherStore = defineStore("together", {
       applying = true;
       try {
         await applyState(player, payload);
-        lastApplied = payload;
       } catch (e) {
         this.error = reason(e, "Не удалось синхронизироваться");
         this.note(formatLocal("ui", this.error));
@@ -452,6 +407,25 @@ export const useTogetherStore = defineStore("together", {
       }
 
       this.reportReady(!player.loading);
+    },
+
+    async onHandoff(to: number, nick: string, address: string, port: number) {
+      if (this.mode !== "guest") return;
+      handoffAt = Date.now();
+
+      if (to === this.selfId) {
+        this.note(formatLocal("ui", "хост передал комнату нам"));
+        Notify.create({ message: "Теперь комнату ведёте вы" });
+        await this.takeOver(port);
+        return;
+      }
+
+      const target = `${address}:${port}`;
+      this.note(formatLocal("ui", `комната переезжает к ${nick} (${target})`));
+      Notify.create({ message: `Комнату ведёт ${nick}` });
+
+      await wait(HANDOFF_DELAY);
+      await this.follow(target);
     },
 
     startTimer() {

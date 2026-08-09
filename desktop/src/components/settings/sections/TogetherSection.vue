@@ -37,9 +37,8 @@
       <TogetherPeers
         :peers="together.peers"
         :waiting="together.waiting"
-        :controllers="together.controllers"
         :manage="together.isHost"
-        @grant="together.grant"
+        @handoff="together.handoff"
       />
 
       <p v-if="together.waitingNicks.length" class="together-wait">
@@ -47,16 +46,13 @@
       </p>
 
       <p v-if="together.isHost" class="together-hint">
-        Выдайте участнику управление, чтобы он мог ставить на паузу,
-        перематывать и менять трек для всей комнаты.
+        Ведёт всегда хост. Если включать треки должен другой человек, передайте
+        ему хост: он поднимет комнату у себя, остальные переподключатся сами.
       </p>
 
       <p v-else class="together-hint">
-        {{
-          together.rights
-            ? "Хост выдал вам управление: пауза, перемотка и смена трека уйдут всем"
-            : "Управляет хост, вы повторяете его плеер"
-        }}
+        Ведёт {{ together.hostNick }}, вы повторяете его плеер. Чтобы включать
+        треки самому, попросите передать хост.
       </p>
     </div>
 

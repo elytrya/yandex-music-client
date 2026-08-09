@@ -15,10 +15,15 @@ export const HEARTBEAT_MS = 1000;
 export const RESEND_MS = 5000;
 // склейка частых изменений в одну отправку
 export const PUSH_DEBOUNCE = 80;
-// сколько ждём подтверждение своей команды, прежде чем снова слушать хоста
-export const CONTROL_GRACE = 8000;
 // сколько треков очереди уезжает в комнату вместе с состоянием
 export const QUEUE_LIMIT = 120;
+// сколько ждём, пока новый хост поднимет комнату
+export const HANDOFF_DELAY = 900;
+// сколько раз стучимся к новому хосту и с каким шагом
+export const HANDOFF_RETRIES = 6;
+export const HANDOFF_GAP = 700;
+// в этом окне разрыв связи — часть переезда, а не поломка
+export const HANDOFF_WINDOW = 15000;
 
 export interface StatePayload {
   kind: "state";
@@ -32,10 +37,6 @@ export interface StatePayload {
   track: Track | null;
   queue: Track[];
   index: number;
-  // номер команды участника с правами
-  cmd?: number;
-  // номер команды, которую хост уже принял
-  ack?: number;
 }
 
 export interface ReadyPayload {
@@ -44,18 +45,22 @@ export interface ReadyPayload {
   ready: boolean;
 }
 
-export interface RightsPayload {
-  kind: "rights";
-  ids: number[];
-}
-
 export interface NotePayload {
   kind: "note";
   text: string;
 }
 
+/** Комната переезжает: участник `to` поднимает её у себя. */
+export interface HandoffPayload {
+  kind: "handoff";
+  to: number;
+  nick: string;
+  address: string;
+  port: number;
+}
+
 export type TogetherPayload =
-  StatePayload | ReadyPayload | RightsPayload | NotePayload;
+  StatePayload | ReadyPayload | NotePayload | HandoffPayload;
 
 export interface TogetherMessage {
   from: number;

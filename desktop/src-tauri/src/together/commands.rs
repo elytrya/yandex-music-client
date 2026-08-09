@@ -182,6 +182,28 @@ pub fn together_status(app: AppHandle) -> TogetherStatus {
     snapshot(&app)
 }
 
+/// Адрес участника глазами хоста: по нему остальные найдут нового хоста.
+#[tauri::command]
+pub fn together_peer_address(app: AppHandle, id: u64) -> Option<String> {
+    let state = app.state::<TogetherState>();
+    let room = state.inner.lock().unwrap();
+
+    let address = room
+        .peers
+        .get(&id)
+        .and_then(|peer| peer.stream.peer_addr().ok())
+        .map(|addr| addr.ip().to_string());
+
+    drop(room);
+
+    match address.as_deref() {
+        Some(value) => tlog(&app, "host", &format!("адрес участника {id}: {value}")),
+        None => tlog(&app, "host", &format!("адрес участника {id} не найден")),
+    }
+
+    address
+}
+
 #[tauri::command]
 pub fn together_log_path(app: AppHandle) -> String {
     log_path(&app)
