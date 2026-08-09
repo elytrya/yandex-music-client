@@ -8,6 +8,7 @@ mod oauth;
 mod presence;
 mod proxy;
 mod state;
+mod together;
 mod tray;
 mod yandex;
 
@@ -24,6 +25,7 @@ pub fn run() {
         })
         .manage(AppState::default())
         .manage(DiscordState::default())
+        .manage(together::TogetherState::default())
         .setup(|app| {
             for (_, window) in app.webview_windows() {
                 if let Ok(icon) =
@@ -116,6 +118,11 @@ pub fn run() {
             mini::enter_mini_player,
             mini::resize_mini_player,
             mini::exit_mini_player,
+            together::commands::together_host,
+            together::commands::together_join,
+            together::commands::together_leave,
+            together::commands::together_send,
+            together::commands::together_status,
             files::export_text_file,
             files::read_text_file,
             files::open_external,
