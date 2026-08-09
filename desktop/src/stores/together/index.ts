@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { Notify } from "quasar";
+import { watch } from "vue";
 import type { WatchStopHandle } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -27,6 +28,16 @@ import { reconnect, wait } from "./handoff";
 import { keepAlive, nicksOf, withId } from "./roster";
 import { applyState, buildState } from "./sync";
 import { watchPlayer } from "./watch";
+import {
+  bindRelay,
+  handoffRelay,
+  leaveRoom,
+  pushRelay,
+  relayActive,
+  relayIsHost,
+  relayView,
+} from "./relay";
+import type { RelayStatus } from "@/api/relay";
 
 const HOST_ID = 0;
 
@@ -39,7 +50,7 @@ let applying = false;
 let holding = false;
 let resumeAfterWait = false;
 let lastReady: boolean | null = null;
-// когда начался переезд комнаты: в это окно разрыв связи ожидаем
+
 let handoffAt = 0;
 
 interface TogetherState {
@@ -48,6 +59,7 @@ interface TogetherState {
   address: string | null;
   nick: string;
   selfId: number;
+  hostId: number;
   peers: TogetherPeer[];
   waiting: number[];
   busy: boolean;
@@ -68,6 +80,7 @@ export const useTogetherStore = defineStore("together", {
     address: null,
     nick: loadNick(),
     selfId: 0,
+    hostId: 0,
     peers: [],
     waiting: [],
     busy: false,
@@ -78,12 +91,19 @@ export const useTogetherStore = defineStore("together", {
   }),
 
   getters: {
-    active: (s) => s.mode !== "off",
-    isHost: (s) => s.mode === "host",
-    invite: (s) => (s.address ? `${s.address}:${s.port}` : ""),
+    active: (s) => relayActive.value || s.mode !== "off",
+    isHost: (s) => (relayActive.value ? relayIsHost.value : s.mode === "host"),
+    isGuest: (s) =>
+      relayActive.value ? !relayIsHost.value : s.mode === "guest",
+    invite: (s) =>
+      relayActive.value
+        ? relayView.value.invite
+        : s.address
+          ? `${s.address}:${s.port}`
+          : "",
     waitingNicks: (s) => nicksOf(s.waiting, s.peers),
     hostNick: (s) =>
-      s.peers.find((peer) => peer.id === HOST_ID)?.nick ?? "хост",
+      s.peers.find((peer) => peer.id === s.hostId)?.nick ?? "хост",
   },
 
   actions: {
@@ -105,7 +125,7 @@ export const useTogetherStore = defineStore("together", {
         await listen<{ reason: string }>("together://closed", (event) => {
           this.stopTimer();
           this.note(formatLocal("ui", event.payload.reason));
-          // во время передачи хоста разрыв — норма, не пугаем человека
+
           if (Date.now() - handoffAt < HANDOFF_WINDOW) return;
           Notify.create({ message: event.payload.reason });
         }),
@@ -117,6 +137,29 @@ export const useTogetherStore = defineStore("together", {
           loading: (busy) => this.reportReady(!busy),
         });
       }
+
+      await bindRelay({
+        onMessage: (from, nick, payload) => {
+          void this.receive({
+            from,
+            nick,
+            payload: payload as unknown as TogetherPayload,
+          });
+        },
+        onJoined: () => this.push(),
+        onClosed: (closed) => {
+          this.stopTimer();
+          this.note(formatLocal("ui", closed));
+        },
+      });
+
+      stops.push(
+        watch(
+          () => relayView.value,
+          (status) => this.applyRelay(status),
+          { deep: true, immediate: true },
+        ),
+      );
 
       try {
         this.apply(await togetherApi.status());
@@ -158,6 +201,34 @@ export const useTogetherStore = defineStore("together", {
       this.startTimer();
     },
 
+    applyRelay(status: RelayStatus) {
+      if (status.connected) {
+        this.peers = status.peers.map((peer) => ({
+          id: peer.id,
+          nick: peer.nick,
+        }));
+        this.selfId = status.selfId;
+        this.hostId = status.host;
+        if (status.nick) this.nick = status.nick;
+
+        this.waiting = keepAlive(this.waiting, this.peers);
+        if (this.isHost && !this.waiting.length) this.release();
+        this.startTimer();
+        return;
+      }
+
+      if (this.mode === "off") {
+        this.peers = [];
+        this.selfId = 0;
+        this.hostId = 0;
+        this.waiting = [];
+        lastReady = null;
+        holding = false;
+        resumeAfterWait = false;
+        this.stopTimer();
+      }
+    },
+
     async host(port?: number) {
       this.busy = true;
       this.error = null;
@@ -191,7 +262,11 @@ export const useTogetherStore = defineStore("together", {
     async leave() {
       this.busy = true;
       try {
-        this.apply(await togetherApi.leave());
+        if (relayActive.value) {
+          await leaveRoom();
+        } else {
+          this.apply(await togetherApi.leave());
+        }
       } catch (e) {
         this.error = reason(e, "Не удалось отключиться");
         this.note(formatLocal("ui", this.error));
@@ -206,6 +281,10 @@ export const useTogetherStore = defineStore("together", {
     },
 
     send(payload: TogetherPayload) {
+      if (relayActive.value) {
+        void pushRelay(payload as unknown as Record<string, unknown>);
+        return;
+      }
       if (this.mode === "off") return;
       void togetherApi.send(payload).catch((e: unknown) => {
         this.note(
@@ -214,24 +293,41 @@ export const useTogetherStore = defineStore("together", {
       });
     },
 
-    /** @param full вместе с очередью или только позиция и текущий трек */
     push(full = true) {
-      if (this.mode !== "host") return;
+      if (!this.isHost) return;
 
       lastSent = Date.now();
       this.send(buildState(usePlayerStore(), full));
     },
 
-    /** Локальное действие хоста: сразу в сеть, без ожидания тика. */
     onLocalChange(why: string) {
-      if (applying || this.mode !== "host") return;
+      if (applying || !this.isHost) return;
 
       this.push();
       this.note(formatLocal("ui", `${why}: разослал комнате`));
     },
 
-    /** Хост отдаёт комнату участнику: теперь ведёт он, остальные переезжают. */
     async handoff(id: number) {
+      if (relayActive.value) {
+        if (!this.isHost || this.busy) return;
+
+        const target = this.peers.find((item) => item.id === id);
+        if (!target || id === this.hostId) return;
+
+        const agree = await askConfirm({
+          title: `Передать комнату: ${target.nick}?`,
+          message:
+            "Участник станет хостом и будет вести плеер. Остальные, включая вас, продолжат слушать уже его.",
+          okLabel: "Передать",
+        });
+        if (!agree) return;
+
+        await handoffRelay(id);
+        this.note(formatLocal("ui", `передаю комнату: ${target.nick}`));
+        Notify.create({ message: `Комната переезжает к ${target.nick}` });
+        return;
+      }
+
       if (this.mode !== "host" || id === HOST_ID || this.busy) return;
 
       const peer = this.peers.find((item) => item.id === id);
@@ -271,14 +367,12 @@ export const useTogetherStore = defineStore("together", {
       this.note(formatLocal("ui", `передаю комнату: ${peer.nick} (${target})`));
       Notify.create({ message: `Комната переезжает к ${peer.nick}` });
 
-      // даём сообщению уйти в сеть и только потом гасим свою комнату
       await wait(HANDOFF_DELAY / 2);
       await this.leave();
       await wait(HANDOFF_DELAY);
       await this.follow(target);
     },
 
-    /** Участник принимает комнату на себя. */
     async takeOver(port: number) {
       handoffAt = Date.now();
 
@@ -296,7 +390,6 @@ export const useTogetherStore = defineStore("together", {
       this.push();
     },
 
-    /** Переезд к новому хосту с несколькими попытками. */
     async follow(target: string) {
       const done = await reconnect(target, {
         join: (address) => this.join(address),
@@ -315,7 +408,7 @@ export const useTogetherStore = defineStore("together", {
     },
 
     reportReady(ready: boolean) {
-      if (this.mode !== "guest" || lastReady === ready) return;
+      if (!this.isGuest || lastReady === ready) return;
 
       lastReady = ready;
       this.send({
@@ -339,7 +432,7 @@ export const useTogetherStore = defineStore("together", {
     },
 
     hold() {
-      if (this.mode !== "host" || holding) return;
+      if (!this.isHost || holding) return;
 
       const player = usePlayerStore();
       holding = true;
@@ -383,13 +476,13 @@ export const useTogetherStore = defineStore("together", {
       }
 
       if (payload.kind === "ready") {
-        if (this.mode !== "host") return;
+        if (!this.isHost) return;
         this.setWaiting(message.from, !payload.ready, message.nick);
         return;
       }
 
       if (payload.kind !== "state" || applying) return;
-      if (this.mode !== "guest") return;
+      if (!this.isGuest) return;
 
       const player = usePlayerStore();
       if (payload.trackId && payload.trackId !== player.current?.id) {
@@ -439,14 +532,13 @@ export const useTogetherStore = defineStore("together", {
       timer = null;
     },
 
-    /** Страховка на случай потери событий: основная синхронизация идёт по событиям. */
     tick() {
-      if (this.mode === "guest") {
+      if (this.isGuest) {
         this.reportReady(!usePlayerStore().loading);
         return;
       }
 
-      if (this.mode !== "host") return;
+      if (!this.isHost) return;
       if (Date.now() - lastSent > RESEND_MS) this.push(false);
     },
   },
