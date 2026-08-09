@@ -1,19 +1,55 @@
 <template>
   <div class="settings-page">
     <aside class="settings-nav">
-      <div class="settings-nav-title">Настройки</div>
+      <div class="settings-nav-head">
+        <div class="settings-nav-title">Настройки</div>
 
-      <button
-        v-for="section in sections"
-        :key="section.id"
-        class="settings-nav-item"
-        :class="{ on: active === section.id }"
-        type="button"
-        @click="select(section.id)"
-      >
-        <Icon :name="section.icon" :size="15" />
-        {{ section.label }}
-      </button>
+        <label class="settings-search">
+          <Icon name="search" :size="14" />
+
+          <input
+            v-model="query"
+            type="text"
+            placeholder="Найти настройку"
+            spellcheck="false"
+          />
+
+          <button
+            v-if="query"
+            class="settings-search-clear"
+            type="button"
+            @click="query = ''"
+          >
+            <Icon name="close" :size="11" />
+          </button>
+        </label>
+      </div>
+
+      <div class="settings-nav-list">
+        <div
+          v-for="group in groups"
+          :key="group.title"
+          class="settings-nav-group"
+        >
+          <div class="settings-nav-group-title">{{ group.title }}</div>
+
+          <button
+            v-for="section in group.items"
+            :key="section.id"
+            class="settings-nav-item"
+            :class="{ on: active === section.id }"
+            type="button"
+            @click="select(section.id)"
+          >
+            <Icon :name="section.icon" :size="15" />
+            {{ section.label }}
+          </button>
+        </div>
+
+        <p v-if="!groups.length" class="settings-nav-empty">
+          Ничего не нашлось
+        </p>
+      </div>
 
       <div class="settings-nav-divider" />
 
@@ -60,84 +96,147 @@ const equalizer = useEqualizerStore();
 const player = usePlayerStore();
 
 const scrollRoot = ref<HTMLElement | null>(null);
+const query = ref("");
+
+const GROUPS = ["Основное", "Плеер", "Библиотека", "Сеть", "Система"];
 
 const sections = [
   {
     id: "theme",
     label: "Оформление",
     icon: "display",
+    group: "Основное",
+    hint: "тема цвет акцент шрифт фон",
     component: AppearanceSection,
   },
   {
     id: "layout",
     label: "Интерфейс",
     icon: "layout",
+    group: "Основное",
+    hint: "макет сайдбар панели очередь",
     component: LayoutSection,
-  },
-  { id: "player", label: "Плеер", icon: "play", component: PlayerSection },
-  {
-    id: "mini",
-    label: "Мини-плеер",
-    icon: "mini",
-    component: MiniPlayerSection,
   },
   {
     id: "behavior",
     label: "Поведение",
     icon: "settings",
+    group: "Основное",
+    hint: "трей запуск закрытие окно",
     component: BehaviorSection,
   },
   {
-    id: "playlists",
-    label: "Плейлисты",
-    icon: "library",
-    component: PlaylistToolsSection,
+    id: "player",
+    label: "Плеер",
+    icon: "play",
+    group: "Плеер",
+    hint: "качество громкость воспроизведение",
+    component: PlayerSection,
   },
   {
-    id: "together",
-    label: "Слушать вместе",
-    icon: "person",
-    component: TogetherSection,
-  },
-  {
-    id: "hotkeys",
-    label: "Горячие клавиши",
-    icon: "key",
-    component: HotkeysSection,
-  },
-  {
-    id: "lyrics",
-    label: "Текст песни",
-    icon: "lyrics",
-    component: LyricsSection,
-  },
-  {
-    id: "genius",
-    label: "Genius",
-    icon: "note",
-    component: GeniusSection,
+    id: "mini",
+    label: "Мини-плеер",
+    icon: "mini",
+    group: "Плеер",
+    hint: "маленькое окно поверх всех",
+    component: MiniPlayerSection,
   },
   {
     id: "equalizer",
     label: "Эквалайзер",
     icon: "wave",
+    group: "Плеер",
+    hint: "звук басы частоты",
     component: EqualizerSection,
+  },
+  {
+    id: "lyrics",
+    label: "Текст песни",
+    icon: "lyrics",
+    group: "Плеер",
+    hint: "слова караоке строки",
+    component: LyricsSection,
+  },
+  {
+    id: "playlists",
+    label: "Плейлисты",
+    icon: "library",
+    group: "Библиотека",
+    hint: "скрытые сортировка главное",
+    component: PlaylistToolsSection,
   },
   {
     id: "downloads",
     label: "Загрузки",
     icon: "download",
+    group: "Библиотека",
+    hint: "скачивание папка файлы",
     component: DownloadsSection,
+  },
+  {
+    id: "cache",
+    label: "Кеш",
+    icon: "trash",
+    group: "Библиотека",
+    hint: "очистка место обложки",
+    component: CacheSection,
+  },
+  {
+    id: "together",
+    label: "Слушать вместе",
+    icon: "person",
+    group: "Сеть",
+    hint: "комната радмин локалка синхрон",
+    component: TogetherSection,
+  },
+  {
+    id: "genius",
+    label: "Genius",
+    icon: "note",
+    group: "Сеть",
+    hint: "genius тексты токен",
+    component: GeniusSection,
   },
   {
     id: "discord",
     label: "Discord",
     icon: "discord",
+    group: "Сеть",
+    hint: "discord дискорд статус rpc",
     component: DiscordSection,
   },
-  { id: "cache", label: "Кеш", icon: "trash", component: CacheSection },
-  { id: "about", label: "О проекте", icon: "info", component: AboutSection },
+  {
+    id: "hotkeys",
+    label: "Горячие клавиши",
+    icon: "key",
+    group: "Система",
+    hint: "кнопки сочетания глобальные",
+    component: HotkeysSection,
+  },
+  {
+    id: "about",
+    label: "О проекте",
+    icon: "info",
+    group: "Система",
+    hint: "версия github автор",
+    component: AboutSection,
+  },
 ];
+
+const groups = computed(() => {
+  const needle = query.value.trim().toLowerCase();
+
+  return GROUPS.map((title) => ({
+    title,
+    items: sections.filter(
+      (section) =>
+        section.group === title &&
+        (!needle ||
+          section.label.toLowerCase().includes(needle) ||
+          section.hint.includes(needle)),
+    ),
+  })).filter((group) => group.items.length > 0);
+});
 
 const route = useRoute();
 
