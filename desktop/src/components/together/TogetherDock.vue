@@ -29,7 +29,16 @@
       <div v-if="together.isHost" class="together-dock-row">
         <span class="together-dock-label">Адрес</span>
 
-        <code>{{ shown ? invite : "•".repeat(12) }}</code>
+        <code
+          class="together-dock-code"
+          :title="
+            visible ? 'Нажмите, чтобы скопировать' : 'Наведите, чтобы увидеть'
+          "
+          @mouseenter="hover = true"
+          @mouseleave="hover = false"
+          @click="copyInvite"
+          >{{ visible ? invite : mask }}</code
+        >
 
         <button
           class="together-dock-icon"
@@ -75,7 +84,6 @@
 
       <div class="together-dock-actions">
         <button type="button" @click="openSettings">Настройки</button>
-        <button type="button" @click="resetPlace">На место</button>
         <button
           type="button"
           class="danger"
@@ -92,13 +100,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Notify } from "quasar";
 import Icon from "@/components/Icon.vue";
 import TogetherPeers from "@/components/together/TogetherPeers.vue";
+import { copyText } from "@/lib/clipboard";
+import { clampPlace, loadPlace, savePlace } from "@/lib/dock-place";
 import { usePlayerStore } from "@/stores/player/index";
 import { useTogetherStore } from "@/stores/together/index";
 import { DOCK_KEY, DOCK_POS_KEY } from "@/stores/together/protocol";
-import { clampPlace, loadPlace, savePlace } from "@/lib/dock-place";
 
 const router = useRouter();
 const together = useTogetherStore();
@@ -107,13 +115,16 @@ const player = usePlayerStore();
 const root = ref<HTMLElement | null>(null);
 const open = ref(false);
 const shown = ref(false);
+const hover = ref(false);
 const dragging = ref(false);
 const place = ref(loadPlace(DOCK_POS_KEY));
 
 let from = { x: 0, y: 0, left: 0, top: 0 };
 let moved = false;
 
+const mask = "•".repeat(12);
 const waiting = computed(() => together.waiting.length > 0);
+const visible = computed(() => shown.value || hover.value);
 const invite = computed(() => together.invite || `ваш-ip:${together.port}`);
 
 const nowPlaying = computed(() =>
@@ -193,18 +204,13 @@ function keepInside() {
   savePlace(DOCK_POS_KEY, place.value);
 }
 
-function resetPlace() {
-  place.value = null;
-  savePlace(DOCK_POS_KEY, null);
-}
-
-async function copyInvite() {
-  try {
-    await navigator.clipboard.writeText(together.invite);
-    Notify.create({ message: "Адрес скопирован" });
-  } catch {
-    Notify.create({ message: "Не удалось скопировать" });
-  }
+function copyInvite() {
+  // в буфер уходит только настоящий адрес, а не заглушка и не точки
+  void copyText(
+    together.invite,
+    "Адрес скопирован",
+    "Адрес ещё не определился",
+  );
 }
 
 function openSettings() {
@@ -310,13 +316,17 @@ function openSettings() {
   color: var(--fg-faint);
 }
 
-.together-dock-row code {
+.together-dock-code {
   flex: 1 1 auto;
   overflow: hidden;
   color: var(--fg);
   text-overflow: ellipsis;
   white-space: nowrap;
-  user-select: all;
+  cursor: pointer;
+}
+
+.together-dock-code:hover {
+  color: var(--accent);
 }
 
 .together-dock-value {

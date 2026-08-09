@@ -44,7 +44,15 @@
     <b>Адрес для друзей</b>
 
     <div class="together-invite-line">
-      <code>{{ shown ? invite : "•".repeat(14) }}</code>
+      <code
+        :title="
+          visible ? 'Нажмите, чтобы скопировать' : 'Наведите, чтобы увидеть'
+        "
+        @mouseenter="hover = true"
+        @mouseleave="hover = false"
+        @click="copyInvite"
+        >{{ visible ? invite : mask }}</code
+      >
 
       <button
         class="together-invite-icon"
@@ -75,23 +83,26 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { Notify } from "quasar";
 import Icon from "@/components/Icon.vue";
+import { copyText } from "@/lib/clipboard";
 import { useTogetherStore } from "@/stores/together/index";
 
 const together = useTogetherStore();
 const port = ref(together.port);
 const shown = ref(false);
+const hover = ref(false);
 
+const mask = "•".repeat(14);
+const visible = computed(() => shown.value || hover.value);
 const invite = computed(() => together.invite || `ваш-ip:${together.port}`);
 
-async function copyInvite() {
-  try {
-    await navigator.clipboard.writeText(together.invite || invite.value);
-    Notify.create({ message: "Адрес скопирован" });
-  } catch {
-    Notify.create({ message: "Не удалось скопировать" });
-  }
+function copyInvite() {
+  // копируем только реальный адрес, а не подсказку в поле
+  void copyText(
+    together.invite,
+    "Адрес скопирован",
+    "Адрес ещё не определился",
+  );
 }
 </script>
 
@@ -137,7 +148,11 @@ async function copyInvite() {
   font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  user-select: all;
+  cursor: pointer;
+}
+
+.together-invite code:hover {
+  color: var(--accent, inherit);
 }
 
 .together-invite-icon {
