@@ -37,12 +37,19 @@
             v-for="section in group.items"
             :key="section.id"
             class="settings-nav-item"
-            :class="{ on: active === section.id }"
+            :class="{ on: active === section.id, hits: section.hits.length }"
             type="button"
             @click="select(section.id)"
           >
             <Icon :name="section.icon" :size="15" />
-            {{ section.label }}
+
+            <span class="settings-nav-text">
+              <span class="settings-nav-label">{{ section.label }}</span>
+
+              <span v-if="section.hits.length" class="settings-nav-hits">
+                {{ section.hits.join(" · ") }}
+              </span>
+            </span>
           </button>
         </div>
 
@@ -87,6 +94,7 @@ import MiniPlayerSection from "@/components/settings/sections/MiniPlayerSection.
 import PlayerSection from "@/components/settings/sections/PlayerSection.vue";
 import PlaylistToolsSection from "@/components/settings/sections/PlaylistToolsSection.vue";
 import TogetherSection from "@/components/settings/sections/TogetherSection.vue";
+import { matchItems } from "@/lib/settings-catalog";
 import { useEqualizerStore } from "@/stores/equalizer";
 import { usePlayerStore } from "@/stores/player/index";
 import { useUiStore } from "@/stores/ui/index";
@@ -228,13 +236,20 @@ const groups = computed(() => {
 
   return GROUPS.map((title) => ({
     title,
-    items: sections.filter(
-      (section) =>
-        section.group === title &&
-        (!needle ||
+    items: sections
+      .filter((section) => section.group === title)
+      .map((section) => ({
+        ...section,
+        // подпункты раздела, попавшие в запрос
+        hits: matchItems(section.id, needle).slice(0, 2),
+      }))
+      .filter(
+        (section) =>
+          !needle ||
           section.label.toLowerCase().includes(needle) ||
-          section.hint.includes(needle)),
-    ),
+          section.hint.includes(needle) ||
+          section.hits.length > 0,
+      ),
   })).filter((group) => group.items.length > 0);
 });
 
