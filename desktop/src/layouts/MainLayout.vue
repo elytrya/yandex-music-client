@@ -392,6 +392,7 @@
 
     <MiniPlayer v-if="panels.mini && !panels.hidden" />
 
+    <TogetherDock />
     <FullscreenPlayer />
     <TrackLyricsDialog />
     <AppDialog />
@@ -415,6 +416,7 @@ import FullscreenPlayer from "@/components/FullscreenPlayer.vue";
 import LyricsPanel from "@/components/LyricsPanel.vue";
 import MiniPlayer from "@/components/MiniPlayer.vue";
 import PlayerBar from "@/components/PlayerBar.vue";
+import TogetherDock from "@/components/together/TogetherDock.vue";
 import TrackLyricsDialog from "@/components/TrackLyricsDialog.vue";
 import AppDialog from "@/components/AppDialog.vue";
 import WindowControls from "@/components/WindowControls.vue";
