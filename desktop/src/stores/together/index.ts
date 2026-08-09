@@ -9,7 +9,11 @@ import type {
   TogetherStatus,
 } from "@/api/together";
 import { usePlayerStore } from "@/stores/player/index";
-import type { TogetherMessage } from "./protocol";
+import type {
+  StatePayload,
+  TogetherMessage,
+  TogetherPayload,
+} from "./protocol";
 import {
   DEFAULT_PORT,
   HEARTBEAT_MS,
@@ -20,7 +24,10 @@ import {
 } from "./protocol";
 import type { TogetherLogEvent } from "./log";
 import { append, formatEvent, formatLocal } from "./log";
-import { applyState, buildState } from "./sync";
+import { keepAlive, nicksOf, toggleId, withId } from "./roster";
+import { applyState, buildState, expectedPosition } from "./sync";
+
+type Player = ReturnType<typeof usePlayerStore>;
 
 const unlisteners: UnlistenFn[] = [];
 
@@ -29,13 +36,21 @@ let lastProgress = 0;
 let lastTick = 0;
 let lastSent = 0;
 let applying = false;
+let holding = false;
+let resumeAfterWait = false;
+let lastApplied: StatePayload | null = null;
+let lastReady: boolean | null = null;
 
 interface TogetherState {
   mode: TogetherMode;
   port: number;
   address: string | null;
   nick: string;
+  selfId: number;
   peers: TogetherPeer[];
+  waiting: number[];
+  controllers: number[];
+  rights: boolean;
   busy: boolean;
   error: string | null;
   ready: boolean;
@@ -53,7 +68,11 @@ export const useTogetherStore = defineStore("together", {
     port: DEFAULT_PORT,
     address: null,
     nick: loadNick(),
+    selfId: 0,
     peers: [],
+    waiting: [],
+    controllers: [],
+    rights: false,
     busy: false,
     error: null,
     ready: false,
@@ -65,6 +84,8 @@ export const useTogetherStore = defineStore("together", {
     active: (s) => s.mode !== "off",
     isHost: (s) => s.mode === "host",
     invite: (s) => (s.address ? `${s.address}:${s.port}` : ""),
+    canControl: (s) => s.mode === "host" || (s.mode === "guest" && s.rights),
+    waitingNicks: (s) => nicksOf(s.waiting, s.peers),
   },
 
   actions: {
@@ -79,7 +100,10 @@ export const useTogetherStore = defineStore("together", {
         await listen<TogetherMessage>("together://message", (event) => {
           void this.receive(event.payload);
         }),
-        await listen("together://joined", () => this.push()),
+        await listen("together://joined", () => {
+          this.push();
+          this.shareRights();
+        }),
         await listen<TogetherLogEvent>("together://log", (event) => {
           this.note(formatEvent(event.payload));
         }),
@@ -111,10 +135,27 @@ export const useTogetherStore = defineStore("together", {
       this.mode = status.mode;
       this.address = status.address;
       this.peers = status.peers;
+      this.selfId = status.selfId;
       if (status.port) this.port = status.port;
       if (status.nick) this.nick = status.nick;
-      if (status.mode === "host") this.startTimer();
-      else this.stopTimer();
+
+      this.waiting = keepAlive(this.waiting, status.peers);
+      this.controllers = keepAlive(this.controllers, status.peers);
+
+      if (status.mode === "off") {
+        this.waiting = [];
+        this.controllers = [];
+        this.rights = false;
+        lastApplied = null;
+        lastReady = null;
+        holding = false;
+        resumeAfterWait = false;
+        this.stopTimer();
+        return;
+      }
+
+      if (status.mode === "host" && !this.waiting.length) this.release();
+      this.startTimer();
     },
 
     async host(port?: number) {
@@ -164,33 +205,184 @@ export const useTogetherStore = defineStore("together", {
       saveNick(nick);
     },
 
+    send(payload: TogetherPayload) {
+      if (this.mode === "off") return;
+      void togetherApi.send(payload).catch((e: unknown) => {
+        this.note(
+          formatLocal("ui", reason(e, "не удалось отправить сообщение")),
+        );
+      });
+    },
+
     push() {
       if (this.mode !== "host") return;
       lastSent = Date.now();
-      void togetherApi
-        .send(buildState(usePlayerStore()))
-        .catch((e: unknown) => {
-          this.note(
-            formatLocal("ui", reason(e, "не удалось отправить состояние")),
-          );
-        });
+      this.send(buildState(usePlayerStore()));
+    },
+
+    grant(id: number) {
+      if (this.mode !== "host" || id === 0) return;
+
+      this.controllers = toggleId(this.controllers, id);
+      const nick = this.peers.find((peer) => peer.id === id)?.nick ?? `#${id}`;
+      const allowed = this.controllers.includes(id);
+
+      this.note(
+        formatLocal(
+          "ui",
+          allowed ? `${nick} может управлять` : `${nick} больше не управляет`,
+        ),
+      );
+      this.shareRights();
+    },
+
+    shareRights() {
+      if (this.mode !== "host") return;
+      this.send({ kind: "rights", ids: [...this.controllers] });
+    },
+
+    reportReady(ready: boolean) {
+      if (this.mode !== "guest" || lastReady === ready) return;
+
+      lastReady = ready;
+      this.send({
+        kind: "ready",
+        trackId: usePlayerStore().current?.id ?? null,
+        ready,
+      });
+      this.note(formatLocal("ui", ready ? "трек готов" : "гружу трек"));
+    },
+
+    setWaiting(id: number, waiting: boolean, nick: string) {
+      if (this.waiting.includes(id) === waiting) return;
+
+      this.waiting = withId(this.waiting, id, waiting);
+      this.note(
+        formatLocal("ui", waiting ? `${nick} грузит трек` : `${nick} готов`),
+      );
+
+      if (this.waiting.length) this.hold();
+      else this.release();
+    },
+
+    hold() {
+      if (this.mode !== "host" || holding) return;
+
+      const player = usePlayerStore();
+      holding = true;
+      resumeAfterWait = player.isPlaying;
+      if (player.isPlaying) player.toggle();
+
+      this.push();
+      this.note(formatLocal("ui", "ждём загрузку у участников"));
+    },
+
+    release() {
+      if (!holding) return;
+
+      const player = usePlayerStore();
+      holding = false;
+      if (resumeAfterWait && !player.isPlaying) player.toggle();
+      resumeAfterWait = false;
+
+      this.push();
+      this.note(formatLocal("ui", "все загрузились, продолжаем"));
     },
 
     async receive(message: TogetherMessage) {
-      if (this.mode !== "guest" || applying) return;
-
       const payload = message.payload;
-      if (!payload || payload.kind !== "state") return;
+      if (!payload) return;
 
+      if (payload.kind === "ready") {
+        if (this.mode !== "host") return;
+        this.setWaiting(message.from, !payload.ready, message.nick);
+        return;
+      }
+
+      if (payload.kind === "rights") {
+        if (this.mode !== "guest") return;
+
+        const allowed = payload.ids.includes(this.selfId);
+        if (allowed === this.rights) return;
+
+        this.rights = allowed;
+        this.note(
+          formatLocal(
+            "ui",
+            allowed ? "хост выдал управление" : "хост забрал управление",
+          ),
+        );
+        Notify.create({
+          message: allowed
+            ? "Хост выдал вам управление"
+            : "Управление вернулось хосту",
+        });
+        return;
+      }
+
+      if (payload.kind !== "state" || applying) return;
+
+      if (this.mode === "host") {
+        if (!this.controllers.includes(message.from)) return;
+        await this.adopt(payload, message.nick);
+        return;
+      }
+
+      if (this.mode === "guest") await this.follow(payload);
+    },
+
+    async adopt(payload: StatePayload, nick: string) {
       applying = true;
       try {
         await applyState(usePlayerStore(), payload);
+        this.note(formatLocal("ui", `команда от ${nick}`));
+      } catch (e) {
+        this.error = reason(e, "Не удалось выполнить команду участника");
+        this.note(formatLocal("ui", this.error));
+      } finally {
+        applying = false;
+      }
+
+      this.push();
+    },
+
+    async follow(payload: StatePayload) {
+      const player = usePlayerStore();
+      if (payload.trackId && payload.trackId !== player.current?.id) {
+        this.reportReady(false);
+      }
+
+      applying = true;
+      try {
+        await applyState(player, payload);
+        lastApplied = payload;
       } catch (e) {
         this.error = reason(e, "Не удалось синхронизироваться");
         this.note(formatLocal("ui", this.error));
       } finally {
         applying = false;
       }
+
+      this.reportReady(!player.loading);
+    },
+
+    pushControl(player: Player) {
+      if (!lastApplied) return;
+
+      const state = buildState(player);
+      const drift = Math.abs(
+        state.positionMs / 1000 - expectedPosition(lastApplied),
+      );
+      const same =
+        state.trackId === lastApplied.trackId &&
+        state.paused === lastApplied.paused &&
+        drift <= JUMP_LIMIT;
+
+      if (same) return;
+
+      lastApplied = state;
+      this.send(state);
+      this.note(formatLocal("ui", "отправил команду хосту"));
     },
 
     startTimer() {
@@ -207,10 +399,19 @@ export const useTogetherStore = defineStore("together", {
     },
 
     tick() {
-      if (this.mode !== "host") return;
-
       const player = usePlayerStore();
       const now = Date.now();
+
+      if (this.mode === "guest") {
+        this.reportReady(!player.loading);
+        if (this.rights && !applying && !player.loading) {
+          this.pushControl(player);
+        }
+        return;
+      }
+
+      if (this.mode !== "host") return;
+
       const moved = player.isPlaying ? (now - lastTick) / 1000 : 0;
       const jumped =
         Math.abs(player.progress - (lastProgress + moved)) > JUMP_LIMIT;

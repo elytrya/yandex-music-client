@@ -16,16 +16,21 @@ export function buildState(player: Player): StatePayload {
   };
 }
 
+export function expectedPosition(payload: StatePayload): number {
+  const lag = payload.paused
+    ? 0
+    : Math.max(0, Date.now() - payload.updatedAt) / 1000;
+
+  return payload.positionMs / 1000 + lag;
+}
+
 export async function applyState(
   player: Player,
   payload: StatePayload,
 ): Promise<void> {
   if (!payload.trackId) return;
 
-  const lag = payload.paused
-    ? 0
-    : Math.max(0, Date.now() - payload.updatedAt) / 1000;
-  const target = payload.positionMs / 1000 + lag;
+  const target = expectedPosition(payload);
 
   if (player.current?.id !== payload.trackId) {
     const track = await api.track(payload.trackId);

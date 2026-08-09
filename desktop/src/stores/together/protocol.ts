@@ -15,7 +15,18 @@ export interface StatePayload {
   title: string | null;
 }
 
-export type TogetherPayload = StatePayload;
+export interface ReadyPayload {
+  kind: "ready";
+  trackId: string | null;
+  ready: boolean;
+}
+
+export interface RightsPayload {
+  kind: "rights";
+  ids: number[];
+}
+
+export type TogetherPayload = StatePayload | ReadyPayload | RightsPayload;
 
 export interface TogetherMessage {
   from: number;
