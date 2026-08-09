@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { Notify } from "quasar";
+import type { WatchStopHandle } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { togetherApi } from "@/api/together";
@@ -15,6 +16,7 @@ import type {
   TogetherPayload,
 } from "./protocol";
 import {
+  CONTROL_GRACE,
   DEFAULT_PORT,
   HEARTBEAT_MS,
   JUMP_LIMIT,
@@ -26,20 +28,20 @@ import type { TogetherLogEvent } from "./log";
 import { append, formatEvent, formatLocal } from "./log";
 import { keepAlive, nicksOf, toggleId, withId } from "./roster";
 import { applyState, buildState, expectedPosition } from "./sync";
-
-type Player = ReturnType<typeof usePlayerStore>;
+import { watchPlayer } from "./watch";
 
 const unlisteners: UnlistenFn[] = [];
+let stops: WatchStopHandle[] = [];
 
 let timer: number | null = null;
-let lastProgress = 0;
-let lastTick = 0;
 let lastSent = 0;
 let applying = false;
 let holding = false;
 let resumeAfterWait = false;
 let lastApplied: StatePayload | null = null;
 let lastReady: boolean | null = null;
+let pending: StatePayload | null = null;
+let pendingAt = 0;
 
 interface TogetherState {
   mode: TogetherMode;
@@ -86,6 +88,7 @@ export const useTogetherStore = defineStore("together", {
     invite: (s) => (s.address ? `${s.address}:${s.port}` : ""),
     canControl: (s) => s.mode === "host" || (s.mode === "guest" && s.rights),
     waitingNicks: (s) => nicksOf(s.waiting, s.peers),
+    hostNick: (s) => s.peers.find((peer) => peer.id === 0)?.nick ?? "хост",
   },
 
   actions: {
@@ -113,6 +116,13 @@ export const useTogetherStore = defineStore("together", {
           Notify.create({ message: event.payload.reason });
         }),
       );
+
+      if (!stops.length) {
+        stops = watchPlayer(usePlayerStore(), {
+          change: (why) => this.onLocalChange(why),
+          loading: (busy) => this.reportReady(!busy),
+        });
+      }
 
       try {
         this.apply(await togetherApi.status());
@@ -148,6 +158,7 @@ export const useTogetherStore = defineStore("together", {
         this.rights = false;
         lastApplied = null;
         lastReady = null;
+        pending = null;
         holding = false;
         resumeAfterWait = false;
         this.stopTimer();
@@ -218,6 +229,43 @@ export const useTogetherStore = defineStore("together", {
       if (this.mode !== "host") return;
       lastSent = Date.now();
       this.send(buildState(usePlayerStore()));
+    },
+
+    /** Локальное действие пользователя: сразу в сеть, без ожидания тика. */
+    onLocalChange(why: string) {
+      if (applying) return;
+
+      if (this.mode === "host") {
+        this.push();
+        this.note(formatLocal("ui", `${why}: разослал комнате`));
+        return;
+      }
+
+      if (this.mode === "guest" && this.rights) this.pushControl(why);
+    },
+
+    pushControl(why: string) {
+      const state = buildState(usePlayerStore());
+      if (!state.trackId) return;
+
+      if (lastApplied) {
+        const drift = Math.abs(
+          state.positionMs / 1000 - expectedPosition(lastApplied),
+        );
+        const same =
+          state.trackId === lastApplied.trackId &&
+          state.paused === lastApplied.paused &&
+          drift <= JUMP_LIMIT;
+
+        if (same) return;
+      }
+
+      pending = state;
+      pendingAt = Date.now();
+      lastApplied = state;
+
+      this.send(state);
+      this.note(formatLocal("ui", `${why}: команда хосту`));
     },
 
     grant(id: number) {
@@ -331,6 +379,7 @@ export const useTogetherStore = defineStore("together", {
       if (this.mode === "guest") await this.follow(payload);
     },
 
+    /** Хост выполняет команду участника с правами и сразу раздаёт её всем. */
     async adopt(payload: StatePayload, nick: string) {
       applying = true;
       try {
@@ -347,6 +396,16 @@ export const useTogetherStore = defineStore("together", {
     },
 
     async follow(payload: StatePayload) {
+      // пока хост не подтвердил мою команду, его старое состояние игнорируется,
+      // иначе включённый трек тут же откатится назад
+      if (pending && Date.now() - pendingAt < CONTROL_GRACE) {
+        const applied =
+          payload.trackId === pending.trackId &&
+          payload.paused === pending.paused;
+        if (!applied) return;
+        pending = null;
+      }
+
       const player = usePlayerStore();
       if (payload.trackId && payload.trackId !== player.current?.id) {
         this.reportReady(false);
@@ -366,29 +425,8 @@ export const useTogetherStore = defineStore("together", {
       this.reportReady(!player.loading);
     },
 
-    pushControl(player: Player) {
-      if (!lastApplied) return;
-
-      const state = buildState(player);
-      const drift = Math.abs(
-        state.positionMs / 1000 - expectedPosition(lastApplied),
-      );
-      const same =
-        state.trackId === lastApplied.trackId &&
-        state.paused === lastApplied.paused &&
-        drift <= JUMP_LIMIT;
-
-      if (same) return;
-
-      lastApplied = state;
-      this.send(state);
-      this.note(formatLocal("ui", "отправил команду хосту"));
-    },
-
     startTimer() {
       if (timer !== null) return;
-      lastTick = Date.now();
-      lastProgress = usePlayerStore().progress;
       timer = window.setInterval(() => this.tick(), HEARTBEAT_MS);
     },
 
@@ -398,28 +436,15 @@ export const useTogetherStore = defineStore("together", {
       timer = null;
     },
 
+    /** Страховка на случай потери событий: основная синхронизация идёт по событиям. */
     tick() {
-      const player = usePlayerStore();
-      const now = Date.now();
-
       if (this.mode === "guest") {
-        this.reportReady(!player.loading);
-        if (this.rights && !applying && !player.loading) {
-          this.pushControl(player);
-        }
+        this.reportReady(!usePlayerStore().loading);
         return;
       }
 
       if (this.mode !== "host") return;
-
-      const moved = player.isPlaying ? (now - lastTick) / 1000 : 0;
-      const jumped =
-        Math.abs(player.progress - (lastProgress + moved)) > JUMP_LIMIT;
-
-      lastProgress = player.progress;
-      lastTick = now;
-
-      if (jumped || now - lastSent > RESEND_MS) this.push();
+      if (Date.now() - lastSent > RESEND_MS) this.push();
     },
   },
 });
