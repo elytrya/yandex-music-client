@@ -14,6 +14,39 @@ fn clean_nick(nick: &str) -> String {
     trimmed.chars().take(NICK_LIMIT).collect()
 }
 
+fn host_part(hostport: &str) -> &str {
+    let host = hostport.split('/').next().unwrap_or(hostport);
+    if let Some(rest) = host.strip_prefix('[') {
+        return rest.split(']').next().unwrap_or(rest);
+    }
+
+    match host.rfind(':') {
+        Some(index)
+            if !host[..index].contains(':')
+                && host[index + 1..].chars().all(|c| c.is_ascii_digit()) =>
+        {
+            &host[..index]
+        }
+        _ => host,
+    }
+}
+
+fn is_local_host(host: &str) -> bool {
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+
+    if let Ok(v4) = host.parse::<std::net::Ipv4Addr>() {
+        return v4.is_loopback() || v4.is_private() || v4.is_link_local();
+    }
+
+    if let Ok(v6) = host.parse::<std::net::Ipv6Addr>() {
+        return v6.is_loopback();
+    }
+
+    false
+}
+
 fn clean_address(address: &str) -> Result<String, String> {
     let trimmed = address.trim().trim_end_matches('/');
     if trimmed.is_empty() {
@@ -26,6 +59,8 @@ fn clean_address(address: &str) -> Result<String, String> {
         format!("wss://{rest}")
     } else if let Some(rest) = trimmed.strip_prefix("http://") {
         format!("ws://{rest}")
+    } else if is_local_host(host_part(trimmed)) {
+        format!("ws://{trimmed}")
     } else {
         format!("wss://{trimmed}")
     };

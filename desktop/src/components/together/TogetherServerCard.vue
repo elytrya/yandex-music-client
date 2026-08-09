@@ -1,59 +1,53 @@
 <template>
   <div class="setting-row">
     <div class="setting-copy">
-      <b>Комната через сервер</b>
+      <b>Сервер</b>
       <span>
-        Работает через интернет без проброса портов и без vpn. Сервер
-        пересылает только шифротекст — трек и позицию, звук каждый грузит из
-        своего аккаунта.
+        Куда подключаемся. По умолчанию общий сервер mashiro. Можно вбить
+        свой адрес или 127.0.0.1:7332 для локального.
       </span>
     </div>
 
-    <div class="together-controls">
-      <input
-        v-model="address"
-        class="together-input"
-        type="text"
-        placeholder="mashiro.onecorporation.cfd"
-        :disabled="connected"
-      />
+    <input
+      v-model="address"
+      class="together-input wide"
+      type="text"
+      placeholder="mashiro.onecorporation.cfd"
+      :disabled="connected"
+    />
+  </div>
 
-      <button
-        v-if="!connected"
-        class="settings-reset-button"
-        type="button"
-        :disabled="busy"
-        @click="create"
-      >
-        Создать
-      </button>
-
-      <button
-        v-else
-        class="settings-reset-button danger"
-        type="button"
-        :disabled="busy"
-        @click="leave"
-      >
-        Выйти
-      </button>
+  <div v-if="!connected" class="setting-row">
+    <div class="setting-copy">
+      <b>Создать комнату</b>
+      <span>
+        Поднимем комнату на сервере и дадим код из шести слов — просто
+        перешлите его друзьям.
+      </span>
     </div>
+
+    <button
+      class="settings-reset-button"
+      type="button"
+      :disabled="busy"
+      @click="create"
+    >
+      Создать комнату
+    </button>
   </div>
 
   <div v-if="!connected" class="setting-row">
     <div class="setting-copy">
       <b>Войти по коду</b>
-      <span>
-        Вставьте код приглашения от друга — адрес сервера у вас уже общий.
-      </span>
+      <span>Вставьте код из слов, который прислал друг.</span>
     </div>
 
     <div class="together-controls">
       <input
         v-model="invite"
-        class="together-input"
+        class="together-input wide"
         type="text"
-        placeholder="код приглашения"
+        placeholder="olive canyon spirit velvet ladder onion"
         @keyup.enter="join"
       />
 
@@ -68,83 +62,108 @@
     </div>
   </div>
 
-  <div v-if="connected && status.invite" class="together-invite">
-    <b>Код приглашения</b>
+  <div v-if="roomCode" class="together-invite">
+    <b>Код вашей комнаты</b>
 
     <div class="together-invite-line">
-      <code title="Нажмите, чтобы скопировать" @click="copy(status.invite)">{{
-        status.invite
+      <code title="Нажмите, чтобы скопировать" @click="copy(roomCode)">{{
+        roomCode
       }}</code>
 
       <button
         class="together-invite-icon"
         type="button"
         title="Скопировать код"
-        @click="copy(status.invite)"
+        @click="copy(roomCode)"
       >
         <Icon name="copy" :size="14" />
       </button>
     </div>
 
-    <span>Отдайте этот код друзьям, чтобы они вошли в вашу комнату.</span>
+    <span>Перешлите эти шесть слов друзьям — по ним они войдут в комнату.</span>
   </div>
 
-  <div class="together-invite">
-    <b>Сид-фраза этого устройства</b>
+  <div v-if="connected" class="setting-row">
+    <div class="setting-copy">
+      <b>Вы в комнате</b>
+      <span>{{ peopleLabel }}</span>
+    </div>
+
+    <button
+      class="settings-reset-button danger"
+      type="button"
+      :disabled="busy"
+      @click="leave"
+    >
+      Выйти
+    </button>
+  </div>
+
+  <button
+    class="together-advanced-toggle"
+    type="button"
+    @click="advanced = !advanced"
+  >
+    {{ advanced ? "Скрыть дополнительное" : "Дополнительное" }}
+  </button>
+
+  <div v-if="advanced" class="together-invite">
+    <b>Ключ-аккаунт</b>
     <span>
-      Ваша личность в комнатах. Хранится в системном хранилище ключей и не
-      уходит на сервер. Если фразы нет, она создастся сама при входе.
-      Перенесите её на другой компьютер, чтобы остаться собой.
+      Создаётся сам при первом входе и хранится на этом пк. Ничего
+      вводить не надо. Скопируйте эти слова, только если хотите зайти под
+      тем же именем на другом устройстве.
     </span>
 
     <div class="together-controls">
       <span class="together-seed-state">{{
-        hasSeed ? "фраза сохранена" : "фразы пока нет"
+        hasSeed ? "аккаунт готов" : "создастся при входе"
       }}</span>
 
       <button
         class="settings-reset-button"
         type="button"
-        :disabled="busy"
-        @click="makeSeed"
-      >
-        Создать
-      </button>
-
-      <button
-        class="settings-reset-button"
-        type="button"
-        :disabled="!hasSeed"
+        :disabled="busy || !hasSeed"
         @click="showSeed"
       >
-        Показать
+        Показать ключ
       </button>
 
       <button
         class="settings-reset-button danger"
         type="button"
-        :disabled="!hasSeed"
-        @click="dropSeed"
+        :disabled="busy"
+        @click="resetSeed"
       >
-        Забыть
+        Сбросить
       </button>
     </div>
 
     <textarea
+      v-if="phrase"
       v-model="phrase"
       class="together-input phrase"
       rows="2"
-      placeholder="слова через пробел — вставьте, чтобы перенести личность"
     ></textarea>
 
-    <button
-      class="settings-reset-button"
-      type="button"
-      :disabled="!phrase.trim()"
-      @click="saveSeed"
-    >
-      Сохранить фразу
-    </button>
+    <div v-if="phrase" class="together-controls">
+      <button
+        class="settings-reset-button"
+        type="button"
+        @click="copy(phrase)"
+      >
+        Скопировать
+      </button>
+
+      <button
+        class="settings-reset-button"
+        type="button"
+        :disabled="!phrase.trim()"
+        @click="saveSeed"
+      >
+        Сохранить ключ
+      </button>
+    </div>
   </div>
 
   <p v-if="reason" class="together-reason">{{ reason }}</p>
@@ -174,15 +193,20 @@ const address = ref(localStorage.getItem(SERVER_KEY) || DEFAULT_SERVER);
 const invite = ref("");
 const phrase = ref("");
 const hasSeed = ref(false);
+const advanced = ref(false);
 
 const status = relayView;
 const busy = relayBusy;
 const reason = relayReason;
 const connected = computed(() => status.value.connected);
+const roomCode = computed(() => status.value.invite);
+const peopleLabel = computed(() => {
+  const total = status.value.peers.length || 1;
+  return `участников: ${total}`;
+});
 
 onMounted(async () => {
   hasSeed.value = await seedExists();
-  if (status.value.invite) invite.value = status.value.invite;
 });
 
 function remember() {
@@ -195,11 +219,12 @@ async function copy(text: string) {
 
 async function ensureSeed() {
   if (hasSeed.value) return;
-  phrase.value = await seedNew(12);
+  await seedNew(12);
   hasSeed.value = true;
 }
 
-async function makeSeed() {
+async function resetSeed() {
+  await seedForget();
   phrase.value = await seedNew(12);
   hasSeed.value = true;
 }
@@ -213,21 +238,10 @@ async function saveSeed() {
   hasSeed.value = true;
 }
 
-async function dropSeed() {
-  await seedForget();
-  phrase.value = "";
-  hasSeed.value = false;
-}
-
 async function create() {
   remember();
   await ensureSeed();
-  const result = await createRoom(
-    address.value,
-    together.nick,
-    invite.value || undefined,
-  );
-  if (result) invite.value = result.invite;
+  await createRoom(address.value, together.nick, invite.value || undefined);
 }
 
 async function join() {
@@ -258,6 +272,11 @@ async function leave() {
   background: transparent;
   color: inherit;
   font: inherit;
+}
+
+.together-input.wide {
+  width: 280px;
+  max-width: 100%;
 }
 
 .together-input.phrase {
@@ -317,6 +336,22 @@ async function leave() {
 .together-seed-state {
   font-size: 13px;
   opacity: 0.7;
+}
+
+.together-advanced-toggle {
+  align-self: flex-start;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim, inherit);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.together-advanced-toggle:hover {
+  opacity: 1;
 }
 
 .together-reason {

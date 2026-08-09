@@ -109,9 +109,9 @@ type Transport = "local" | "server";
 
 function loadTransport(): Transport {
   try {
-    return localStorage.getItem(TRANSPORT_KEY) === "local" ? "local" : "server";
+    return localStorage.getItem(TRANSPORT_KEY) === "server" ? "server" : "local";
   } catch {
-    return "server";
+    return "local";
   }
 }
 
