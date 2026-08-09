@@ -68,6 +68,7 @@
         :peers="together.peers"
         :waiting="together.waiting"
         :manage="together.isHost"
+        :host-id="together.hostId"
         @handoff="together.handoff"
       />
 
@@ -202,7 +203,7 @@ function keepInside() {
 }
 
 function copyInvite() {
-  // в буфер уходит только настоящий адрес, а не заглушка и не точки
+
   void copyText(
     together.invite,
     "Адрес скопирован",

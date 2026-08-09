@@ -3,11 +3,11 @@
     <div v-for="peer in peers" :key="peer.id" class="together-peer">
       <span>{{ peer.nick }}</span>
 
-      <b v-if="peer.id === 0">ведёт</b>
+      <b v-if="peer.id === hostId">ведёт</b>
       <i v-if="waiting.includes(peer.id)">грузит</i>
 
       <button
-        v-if="manage && peer.id !== 0"
+        v-if="manage && peer.id !== hostId"
         class="together-give"
         type="button"
         title="Участник станет хостом, остальные переподключатся"
@@ -29,10 +29,12 @@ withDefaults(
     peers: TogetherPeer[];
     waiting?: number[];
     manage?: boolean;
+    hostId?: number;
   }>(),
   {
     waiting: () => [],
     manage: false,
+    hostId: 0,
   },
 );
 
