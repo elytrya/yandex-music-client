@@ -2,10 +2,18 @@ import { api } from "@/api/client";
 import type { usePlayerStore } from "@/stores/player/index";
 import type { StatePayload } from "./protocol";
 import { DRIFT_LIMIT } from "./protocol";
+import { findIndex, trimQueue } from "./queue";
 
 type Player = ReturnType<typeof usePlayerStore>;
 
-export function buildState(player: Player): StatePayload {
+/**
+ * @param withQueue полное состояние с очередью или лёгкий пульс без неё
+ */
+export function buildState(player: Player, withQueue = true): StatePayload {
+  const slice = withQueue
+    ? trimQueue(player.queue, player.index)
+    : { queue: [], index: 0 };
+
   return {
     kind: "state",
     trackId: player.current?.id ?? null,
@@ -13,6 +21,9 @@ export function buildState(player: Player): StatePayload {
     paused: !player.isPlaying,
     updatedAt: Date.now(),
     title: player.current?.title ?? null,
+    track: player.current ?? null,
+    queue: slice.queue,
+    index: slice.index,
   };
 }
 
@@ -33,12 +44,37 @@ export async function applyState(
   const target = expectedPosition(payload);
 
   if (player.current?.id !== payload.trackId) {
-    const track = await api.track(payload.trackId);
-    await player.playQueue([track], 0);
+    await startTrack(player, payload);
     player.seek(target);
   } else if (Math.abs(player.progress - target) > DRIFT_LIMIT) {
     player.seek(target);
   }
 
   if (payload.paused === player.isPlaying) player.toggle();
+}
+
+async function startTrack(
+  player: Player,
+  payload: StatePayload,
+): Promise<void> {
+  const trackId = payload.trackId!;
+
+  // прислали очередь — повторяем её целиком, тогда работает и дальше/назад
+  if (payload.queue.length) {
+    const index = findIndex(payload.queue, payload.index, trackId);
+    if (index >= 0) {
+      await player.playQueue(payload.queue, index);
+      return;
+    }
+  }
+
+  // пульс без очереди: берём трек из самого сообщения
+  if (payload.track && payload.track.id === trackId) {
+    await player.playQueue([payload.track], 0);
+    return;
+  }
+
+  // старый клиент или пустое сообщение: тянем трек своим аккаунтом
+  const track = await api.track(trackId);
+  await player.playQueue([track], 0);
 }

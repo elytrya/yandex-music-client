@@ -225,10 +225,11 @@ export const useTogetherStore = defineStore("together", {
       });
     },
 
-    push() {
+    /** @param full вместе с очередью или только позиция и текущий трек */
+    push(full = true) {
       if (this.mode !== "host") return;
       lastSent = Date.now();
-      this.send(buildState(usePlayerStore()));
+      this.send(buildState(usePlayerStore(), full));
     },
 
     /** Локальное действие пользователя: сразу в сеть, без ожидания тика. */
@@ -321,7 +322,7 @@ export const useTogetherStore = defineStore("together", {
       resumeAfterWait = player.isPlaying;
       if (player.isPlaying) player.toggle();
 
-      this.push();
+      this.push(false);
       this.note(formatLocal("ui", "ждём загрузку у участников"));
     },
 
@@ -333,13 +334,19 @@ export const useTogetherStore = defineStore("together", {
       if (resumeAfterWait && !player.isPlaying) player.toggle();
       resumeAfterWait = false;
 
-      this.push();
+      this.push(false);
       this.note(formatLocal("ui", "все загрузились, продолжаем"));
     },
 
     async receive(message: TogetherMessage) {
       const payload = message.payload;
       if (!payload) return;
+
+      if (payload.kind === "note") {
+        this.note(formatLocal("net", `${message.nick}: ${payload.text}`));
+        Notify.create({ message: `${message.nick}: ${payload.text}` });
+        return;
+      }
 
       if (payload.kind === "ready") {
         if (this.mode !== "host") return;
@@ -382,16 +389,22 @@ export const useTogetherStore = defineStore("together", {
     /** Хост выполняет команду участника с правами и сразу раздаёт её всем. */
     async adopt(payload: StatePayload, nick: string) {
       applying = true;
+      let failed: string | null = null;
       try {
         await applyState(usePlayerStore(), payload);
-        this.note(formatLocal("ui", `команда от ${nick}`));
+        this.note(
+          formatLocal("ui", `команда от ${nick}: ${payload.title ?? "трек"}`),
+        );
       } catch (e) {
-        this.error = reason(e, "Не удалось выполнить команду участника");
-        this.note(formatLocal("ui", this.error));
+        failed = reason(e, "не удалось включить трек");
+        this.error = failed;
+        this.note(formatLocal("ui", `команда от ${nick} не вышла: ${failed}`));
       } finally {
         applying = false;
       }
 
+      // чтобы человек не гадал, почему его трек откатился назад
+      if (failed) this.send({ kind: "note", text: failed });
       this.push();
     },
 
@@ -399,10 +412,7 @@ export const useTogetherStore = defineStore("together", {
       // пока хост не подтвердил мою команду, его старое состояние игнорируется,
       // иначе включённый трек тут же откатится назад
       if (pending && Date.now() - pendingAt < CONTROL_GRACE) {
-        const applied =
-          payload.trackId === pending.trackId &&
-          payload.paused === pending.paused;
-        if (!applied) return;
+        if (payload.trackId !== pending.trackId) return;
         pending = null;
       }
 
@@ -444,7 +454,7 @@ export const useTogetherStore = defineStore("together", {
       }
 
       if (this.mode !== "host") return;
-      if (Date.now() - lastSent > RESEND_MS) this.push();
+      if (Date.now() - lastSent > RESEND_MS) this.push(false);
     },
   },
 });

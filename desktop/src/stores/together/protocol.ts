@@ -1,6 +1,9 @@
+import type { Track } from "@/api/types";
+
 export const DEFAULT_PORT = 7331;
 export const NICK_KEY = "mashiro.together.nick";
 export const DOCK_KEY = "mashiro.together.dock";
+export const DOCK_POS_KEY = "mashiro.together.dock.pos";
 
 // насколько можно разъехаться по позиции, прежде чем подтягивать себя
 export const DRIFT_LIMIT = 1.2;
@@ -13,7 +16,9 @@ export const RESEND_MS = 5000;
 // склейка частых изменений в одну отправку
 export const PUSH_DEBOUNCE = 80;
 // сколько ждём подтверждение своей команды, прежде чем снова слушать хоста
-export const CONTROL_GRACE = 1200;
+export const CONTROL_GRACE = 1800;
+// сколько треков очереди уезжает в комнату вместе с состоянием
+export const QUEUE_LIMIT = 120;
 
 export interface StatePayload {
   kind: "state";
@@ -22,6 +27,11 @@ export interface StatePayload {
   paused: boolean;
   updatedAt: number;
   title: string | null;
+  // сам трек и кусок очереди едут целиком: плейлист другого человека
+  // может быть недоступен, а трек по своему id откроется
+  track: Track | null;
+  queue: Track[];
+  index: number;
 }
 
 export interface ReadyPayload {
@@ -35,7 +45,13 @@ export interface RightsPayload {
   ids: number[];
 }
 
-export type TogetherPayload = StatePayload | ReadyPayload | RightsPayload;
+export interface NotePayload {
+  kind: "note";
+  text: string;
+}
+
+export type TogetherPayload =
+  StatePayload | ReadyPayload | RightsPayload | NotePayload;
 
 export interface TogetherMessage {
   from: number;
