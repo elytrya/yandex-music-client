@@ -123,6 +123,7 @@ pub fn run() {
             together::commands::together_leave,
             together::commands::together_send,
             together::commands::together_status,
+            together::commands::together_log_path,
             files::export_text_file,
             files::read_text_file,
             files::open_external,

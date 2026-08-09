@@ -54,6 +54,8 @@ pub struct Room {
     pub address: Option<String>,
     pub self_id: u64,
     pub next_id: u64,
+    // номер подключения: старые потоки не должны гасить новую комнату
+    pub session: u64,
     pub peers: HashMap<u64, Peer>,
     pub roster: Vec<PeerInfo>,
     pub out: Option<Sender<String>>,
