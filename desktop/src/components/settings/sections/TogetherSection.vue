@@ -34,7 +34,30 @@
         <span>{{ together.peers.length }} в комнате</span>
       </div>
 
-      <TogetherPeers :peers="together.peers" />
+      <TogetherPeers
+        :peers="together.peers"
+        :waiting="together.waiting"
+        :controllers="together.controllers"
+        :manage="together.isHost"
+        @grant="together.grant"
+      />
+
+      <p v-if="together.waitingNicks.length" class="together-wait">
+        Ждём загрузку: {{ together.waitingNicks.join(", ") }}
+      </p>
+
+      <p v-if="together.isHost" class="together-hint">
+        Выдайте участнику управление, чтобы он мог ставить на паузу,
+        перематывать и менять трек для всей комнаты.
+      </p>
+
+      <p v-else class="together-hint">
+        {{
+          together.rights
+            ? "Хост выдал вам управление: пауза, перемотка и смена трека уйдут всем"
+            : "Управляет хост, вы повторяете его плеер"
+        }}
+      </p>
     </div>
 
     <p v-if="together.error" class="together-error">{{ together.error }}</p>
@@ -83,5 +106,17 @@ function onNick(event: Event) {
   margin: 0;
   color: var(--danger, #fa2d48);
   font-size: 13px;
+}
+
+.together-wait {
+  margin: 0;
+  font-size: 13px;
+  color: var(--accent, #ffcc00);
+}
+
+.together-hint {
+  margin: 0;
+  opacity: 0.6;
+  font-size: 12px;
 }
 </style>

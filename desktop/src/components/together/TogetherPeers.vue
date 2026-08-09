@@ -2,7 +2,19 @@
   <div class="together-peers">
     <div v-for="peer in peers" :key="peer.id" class="together-peer">
       <span>{{ peer.nick }}</span>
+
       <b v-if="peer.id === 0">ведёт</b>
+      <b v-else-if="controllers.includes(peer.id)">управляет</b>
+      <i v-if="waiting.includes(peer.id)">грузит</i>
+
+      <button
+        v-if="manage && peer.id !== 0"
+        class="together-grant"
+        type="button"
+        @click="emit('grant', peer.id)"
+      >
+        {{ controllers.includes(peer.id) ? "забрать" : "дать управление" }}
+      </button>
     </div>
 
     <p v-if="!peers.length" class="together-empty">Пока никого нет</p>
@@ -12,7 +24,21 @@
 <script setup lang="ts">
 import type { TogetherPeer } from "@/api/together";
 
-defineProps<{ peers: TogetherPeer[] }>();
+withDefaults(
+  defineProps<{
+    peers: TogetherPeer[];
+    waiting?: number[];
+    controllers?: number[];
+    manage?: boolean;
+  }>(),
+  {
+    waiting: () => [],
+    controllers: () => [],
+    manage: false,
+  },
+);
+
+const emit = defineEmits<{ (e: "grant", id: number): void }>();
 </script>
 
 <style scoped>
@@ -37,6 +63,30 @@ defineProps<{ peers: TogetherPeer[] }>();
   font-weight: 500;
   font-size: 11px;
   text-transform: uppercase;
+}
+
+.together-peer i {
+  opacity: 0.75;
+  font-style: normal;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--accent, #ffcc00);
+}
+
+.together-grant {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.together-grant:hover {
+  opacity: 0.9;
 }
 
 .together-empty {
