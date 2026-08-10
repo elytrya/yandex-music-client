@@ -1,9 +1,9 @@
 <template>
   <div
-    v-if="together.active"
+    v-if="together.active && ui.settings.togetherShowDock"
     ref="root"
     class="together-dock"
-    :class="{ open, dragging }"
+    :class="{ open, dragging, mini: panels.mini }"
     :style="style"
   >
     <div
@@ -18,7 +18,7 @@
       <span class="together-dock-dot" :class="{ wait: waiting }" />
 
       <span class="together-dock-title">
-        {{ together.isHost ? "Вы ведёте" : `Слушаете: ${together.hostNick}` }}
+        {{ together.isHost ? "Хостите" : `Слушаете: ${together.hostNick}` }}
       </span>
 
       <span class="together-dock-count">{{ together.peers.length }}</span>
@@ -26,8 +26,8 @@
     </div>
 
     <div v-if="open" class="together-dock-body">
-      <div v-if="together.isHost" class="together-dock-row">
-        <span class="together-dock-label">Адрес</span>
+      <div v-if="showCode" class="together-dock-row">
+        <span class="together-dock-label">{{ codeLabel }}</span>
 
         <code
           class="together-dock-code"
@@ -43,7 +43,7 @@
         <button
           class="together-dock-icon"
           type="button"
-          :title="shown ? 'Скрыть адрес' : 'Показать адрес'"
+          :title="shown ? 'Скрыть' : 'Показать'"
           @click="shown = !shown"
         >
           <Icon :name="shown ? 'eyeOff' : 'eye'" :size="12" />
@@ -52,11 +52,16 @@
         <button
           class="together-dock-icon"
           type="button"
-          title="Скопировать адрес"
+          title="Скопировать"
           @click="copyInvite"
         >
           <Icon name="copy" :size="12" />
         </button>
+      </div>
+
+      <div v-if="together.isRelay" class="together-dock-row">
+        <span class="together-dock-label">Пинг</span>
+        <span class="together-dock-value">{{ pingLabel }}</span>
       </div>
 
       <div class="together-dock-row">
@@ -77,7 +82,7 @@
       </p>
 
       <p v-else-if="!together.isHost" class="together-dock-hint">
-        Ведёт {{ together.hostNick }}, плеер повторяет за ним
+        Хостит {{ together.hostNick }}, плеер повторяет за ним
       </p>
 
       <div class="together-dock-actions">
@@ -102,13 +107,17 @@ import Icon from "@/components/Icon.vue";
 import TogetherPeers from "@/components/together/TogetherPeers.vue";
 import { copyText } from "@/lib/clipboard";
 import { clampPlace, loadPlace, savePlace } from "@/lib/dock-place";
+import { usePanelsStore } from "@/stores/panels";
 import { usePlayerStore } from "@/stores/player/index";
 import { useTogetherStore } from "@/stores/together/index";
+import { useUiStore } from "@/stores/ui/index";
 import { DOCK_KEY, DOCK_POS_KEY } from "@/stores/together/protocol";
 
 const router = useRouter();
 const together = useTogetherStore();
 const player = usePlayerStore();
+const panels = usePanelsStore();
+const ui = useUiStore();
 
 const root = ref<HTMLElement | null>(null);
 const open = ref(false);
@@ -120,10 +129,17 @@ const place = ref(loadPlace(DOCK_POS_KEY));
 let from = { x: 0, y: 0, left: 0, top: 0 };
 let moved = false;
 
-const mask = "•".repeat(12);
+const mask = "\u2022".repeat(12);
 const waiting = computed(() => together.waiting.length > 0);
 const visible = computed(() => shown.value || hover.value);
-const invite = computed(() => together.invite || `ваш-ip:${together.port}`);
+const showCode = computed(() => together.isRelay || together.isHost);
+const codeLabel = computed(() => (together.isRelay ? "Код" : "Адрес"));
+const invite = computed(
+  () => together.invite || (together.isRelay ? "" : `ваш-ip:${together.port}`),
+);
+const pingLabel = computed(() =>
+  together.ping > 0 ? `${together.ping} мс` : "измеряем...",
+);
 
 const nowPlaying = computed(() =>
   player.current ? player.current.title : "ничего не играет",
@@ -203,12 +219,7 @@ function keepInside() {
 }
 
 function copyInvite() {
-
-  void copyText(
-    together.invite,
-    "Адрес скопирован",
-    "Адрес ещё не определился",
-  );
+  void copyText(together.invite, "Скопировано", "Пока нечего копировать");
 }
 
 function openSettings() {
@@ -219,7 +230,7 @@ function openSettings() {
 <style scoped>
 .together-dock {
   position: fixed;
-  z-index: 2400;
+  z-index: 2800;
   bottom: 96px;
   left: 16px;
   width: 268px;
@@ -385,5 +396,38 @@ function openSettings() {
 
 .together-dock-actions button.danger {
   color: var(--accent);
+}
+
+.together-dock.mini {
+  bottom: 8px;
+  left: 8px;
+  width: auto;
+  max-width: 172px;
+  border-radius: 10px;
+}
+
+.together-dock.mini.open {
+  width: auto;
+  max-width: 224px;
+}
+
+.together-dock.mini .together-dock-head {
+  gap: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+.together-dock.mini .together-dock-grip {
+  display: none;
+}
+
+.together-dock.mini .together-dock-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.together-dock.mini .together-dock-count {
+  padding: 0 5px;
+  font-size: 10px;
 }
 </style>

@@ -1,4 +1,4 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
@@ -104,6 +104,7 @@ async fn serve(
         self_id: entered.id,
         host: entered.host,
         peers: Vec::new(),
+        ping: 0,
     };
 
     let status = relay.update(|current| *current = status);
@@ -213,6 +214,8 @@ async fn pump(
     let mut beat = interval(PING);
     beat.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
+    let mut ping_sent: Option<Instant> = None;
+
     loop {
         if !relay.owns(epoch) {
             let _ = writer.send(Message::Text(ClientMessage::RoomLeave.to_frame())).await;
@@ -230,7 +233,13 @@ async fn pump(
                 match frame {
                     Message::Text(text) => {
                         if let Ok(message) = serde_json::from_str::<ServerMessage>(&text) {
-                            if !accept(app, relay, secrets, message) {
+                            if matches!(message, ServerMessage::Pong) {
+                                if let Some(sent) = ping_sent.take() {
+                                    let ms = sent.elapsed().as_millis() as u64;
+                                    let status = relay.update(|status| status.ping = ms);
+                                    announce(app, &status);
+                                }
+                            } else if !accept(app, relay, secrets, message) {
                                 return Ok(());
                             }
                         }
@@ -262,6 +271,7 @@ async fn pump(
                 }
             }
             _ = beat.tick() => {
+                ping_sent = Some(Instant::now());
                 write(&mut writer, &ClientMessage::Ping).await?;
             }
         }

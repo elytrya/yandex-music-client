@@ -38,6 +38,8 @@ pub struct RelayStatus {
 
     pub host: u64,
     pub peers: Vec<PeerInfo>,
+
+    pub ping: u64,
 }
 
 impl RelayStatus {

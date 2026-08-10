@@ -3,9 +3,9 @@
     <div class="settings-group-head">
       <h2>Слушать вместе</h2>
       <p>
-        Синхронное прослушивание по локальной сети или через любой vpn с общей
-        подсетью: radmin vpn, hamachi, zerotier, tailscale, netbird. По сети
-        передаётся только трек и позиция, звук каждый грузит из своего аккаунта.
+        Синхронное прослушивание по локальной сети, через VPN (radmin, hamachi,
+        zerotier) или сервер-ретранслятор. По сети идут только трек и позиция -
+        звук каждый грузит из своего аккаунта.
       </p>
     </div>
 
@@ -28,25 +28,32 @@
     <div class="setting-row">
       <div class="setting-copy">
         <b>Как подключаемся</b>
-        <span>Локально по сети или VPN, либо через сервер-ретранслятор без проброса портов.</span>
+        <span>По сети/VPN или через сервер без проброса портов.</span>
       </div>
 
-      <div class="together-transport">
+      <div class="together-switch" :class="{ locked: together.active }">
+        <span class="together-switch-thumb" :class="transport" />
+
         <button
           type="button"
+          class="together-switch-option"
           :class="{ active: transport === 'local' }"
           :disabled="together.active"
           @click="setTransport('local')"
         >
-          Локально
+          <Icon name="wave" :size="15" />
+          <span>Локально</span>
         </button>
+
         <button
           type="button"
+          class="together-switch-option"
           :class="{ active: transport === 'server' }"
           :disabled="together.active"
           @click="setTransport('server')"
         >
-          Через сервер
+          <Icon name="globe" :size="15" />
+          <span>Через сервер</span>
         </button>
       </div>
     </div>
@@ -60,7 +67,7 @@
 
     <div v-if="together.active" class="setting-row column">
       <div class="setting-copy">
-        <b>{{ together.isHost ? "Вы ведёте" : "Вы слушаете хоста" }}</b>
+        <b>{{ together.isHost ? "Хостите" : "Слушаете хоста" }}</b>
         <span>{{ together.peers.length }} в комнате</span>
       </div>
 
@@ -77,24 +84,41 @@
       </p>
 
       <p v-if="together.isHost" class="together-hint">
-        Ведёт всегда хост. Если включать треки должен другой человек, передайте
-        ему хост: он поднимет комнату у себя, остальные переподключатся сами.
+        Треки для всех включаете вы. Чтобы включал кто-то другой - передайте ему
+        хост.
       </p>
 
       <p v-else class="together-hint">
-        Ведёт {{ together.hostNick }}, вы повторяете его плеер. Чтобы включать
-        треки самому, попросите передать хост.
+        Хостит {{ together.hostNick }} - ваш плеер повторяет за ним. Чтобы
+        самому включать треки, попросите передать вам хост.
       </p>
     </div>
 
+    <SettingToggle
+      :model-value="ui.settings.togetherShowDock"
+      label="Плашка комнаты поверх окна"
+      description="Маленькая панель с текстом «Хостите» / «Слушаете» и списком участников. Комната при этом продолжает работать."
+      @update:model-value="ui.set('togetherShowDock', $event)"
+    />
+
     <p v-if="together.error" class="together-error">{{ together.error }}</p>
 
-    <TogetherLog />
+    <button
+      class="together-log-toggle"
+      type="button"
+      @click="showLog = !showLog"
+    >
+      {{ showLog ? "Скрыть журнал" : "Журнал подключения" }}
+    </button>
+
+    <TogetherLog v-if="showLog" />
   </section>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import Icon from "@/components/Icon.vue";
+import SettingToggle from "@/components/settings/SettingToggle.vue";
 import TogetherHostCard from "@/components/together/TogetherHostCard.vue";
 import TogetherJoinCard from "@/components/together/TogetherJoinCard.vue";
 import TogetherServerCard from "@/components/together/TogetherServerCard.vue";
@@ -102,20 +126,25 @@ import TogetherLog from "@/components/together/TogetherLog.vue";
 import TogetherPeers from "@/components/together/TogetherPeers.vue";
 import { useTogetherStore } from "@/stores/together/index";
 import { TRANSPORT_KEY } from "@/stores/together/protocol";
+import { useUiStore } from "@/stores/ui/index";
 
 const together = useTogetherStore();
+const ui = useUiStore();
 
 type Transport = "local" | "server";
 
 function loadTransport(): Transport {
   try {
-    return localStorage.getItem(TRANSPORT_KEY) === "server" ? "server" : "local";
+    return localStorage.getItem(TRANSPORT_KEY) === "server"
+      ? "server"
+      : "local";
   } catch {
     return "local";
   }
 }
 
 const transport = ref<Transport>(loadTransport());
+const showLog = ref(false);
 
 function setTransport(next: Transport) {
   if (together.active) return;
@@ -145,28 +174,63 @@ function onNick(event: Event) {
   font: inherit;
 }
 
-.together-transport {
+.together-switch {
+  position: relative;
   display: inline-flex;
-  gap: 6px;
+  padding: 3px;
+  border-radius: 11px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  background: var(--surface-2, rgba(255, 255, 255, 0.06));
 }
 
-.together-transport button {
-  padding: 7px 12px;
+.together-switch.locked {
+  opacity: 0.55;
+}
+
+.together-switch-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
   border-radius: 8px;
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--surface, rgba(255, 255, 255, 0.16));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease;
+}
+
+.together-switch-thumb.server {
+  transform: translateX(100%);
+}
+
+.together-switch-option {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  min-width: 130px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
-  color: inherit;
+  color: var(--fg-dim, inherit);
   font: inherit;
+  font-size: 13px;
   cursor: pointer;
+  opacity: 0.7;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
 }
 
-.together-transport button.active {
-  background: var(--surface-2, rgba(255, 255, 255, 0.08));
-  border-color: var(--accent, #ffcc00);
+.together-switch-option.active {
+  color: var(--fg, inherit);
+  opacity: 1;
 }
 
-.together-transport button:disabled {
-  opacity: 0.5;
+.together-switch-option:disabled {
   cursor: default;
 }
 
@@ -192,5 +256,21 @@ function onNick(event: Event) {
   margin: 0;
   opacity: 0.6;
   font-size: 12px;
+}
+
+.together-log-toggle {
+  align-self: flex-start;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim, inherit);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.together-log-toggle:hover {
+  opacity: 1;
 }
 </style>

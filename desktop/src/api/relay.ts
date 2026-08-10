@@ -15,6 +15,7 @@ export interface RelayStatus {
   selfId: number
   host: number
   peers: RelayPeer[]
+  ping: number
 }
 
 export interface RelayMessage {
@@ -41,6 +42,7 @@ export const emptyRelayStatus = (): RelayStatus => ({
   selfId: 0,
   host: 0,
   peers: [],
+  ping: 0,
 })
 
 export function relayCreate(address: string, nick: string, invite?: string) {

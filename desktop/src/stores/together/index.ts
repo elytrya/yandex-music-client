@@ -101,6 +101,8 @@ export const useTogetherStore = defineStore("together", {
         : s.address
           ? `${s.address}:${s.port}`
           : "",
+    isRelay: () => relayActive.value,
+    ping: () => (relayActive.value ? relayView.value.ping : 0),
     waitingNicks: (s) => nicksOf(s.waiting, s.peers),
     hostNick: (s) =>
       s.peers.find((peer) => peer.id === s.hostId)?.nick ?? "хост",
@@ -171,7 +173,6 @@ export const useTogetherStore = defineStore("together", {
 
     note(line: string) {
       this.log = append(this.log, line);
-      console.debug(`[together] ${line}`);
     },
 
     clearLog() {
@@ -508,14 +509,14 @@ export const useTogetherStore = defineStore("together", {
 
       if (to === this.selfId) {
         this.note(formatLocal("ui", "хост передал комнату нам"));
-        Notify.create({ message: "Теперь комнату ведёте вы" });
+        Notify.create({ message: "Теперь хостите вы" });
         await this.takeOver(port);
         return;
       }
 
       const target = `${address}:${port}`;
       this.note(formatLocal("ui", `комната переезжает к ${nick} (${target})`));
-      Notify.create({ message: `Комнату ведёт ${nick}` });
+      Notify.create({ message: `Теперь хостит ${nick}` });
 
       await wait(HANDOFF_DELAY);
       await this.follow(target);

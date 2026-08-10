@@ -3,7 +3,7 @@
     <div v-for="peer in peers" :key="peer.id" class="together-peer">
       <span>{{ peer.nick }}</span>
 
-      <b v-if="peer.id === hostId">ведёт</b>
+      <b v-if="peer.id === hostId">хостит</b>
       <i v-if="waiting.includes(peer.id)">грузит</i>
 
       <button

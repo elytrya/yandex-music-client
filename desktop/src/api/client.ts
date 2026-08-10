@@ -63,10 +63,11 @@ export const api = {
   me: () => call<Profile>("auth_me"),
   logout: () => call<void>("auth_logout"),
 
-  wave: (queue?: string, station?: string) => {
+  wave: (opts?: { station?: string; sessionId?: string; queue?: string[] }) => {
     const args: Record<string, unknown> = {};
-    if (queue) args.queue = queue;
-    if (station) args.station = station;
+    if (opts?.station) args.station = opts.station;
+    if (opts?.sessionId) args.session = opts.sessionId;
+    if (opts?.queue?.length) args.queue = opts.queue;
     return call<WaveResponse>("get_wave", args);
   },
 

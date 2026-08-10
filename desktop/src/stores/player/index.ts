@@ -32,6 +32,7 @@ import { useEqualizerStore } from "@/stores/equalizer";
 import { useLibraryStore } from "@/stores/library";
 import { useSleepStore } from "@/stores/sleep";
 import { useStatsStore } from "@/stores/stats";
+import { useTogetherStore } from "@/stores/together/index";
 import type { LyricsSource } from "@/stores/ui/defaults";
 import { DEFAULT_DISCORD_CLIENT_ID, useUiStore } from "@/stores/ui/index";
 import { artistNames } from "@/lib/format";
@@ -103,6 +104,7 @@ interface PlayerState {
   censorAvailable: boolean;
   loading: boolean;
   waveBatchId: string | null;
+  waveSessionId: string | null;
   isWave: boolean;
   stationId: string | null;
   stationName: string | null;
@@ -165,6 +167,7 @@ export const usePlayerStore = defineStore("player", {
       censorAvailable: false,
       loading: false,
       waveBatchId: null,
+      waveSessionId: null,
       isWave: false,
       stationId: null,
       stationName: null,
@@ -251,7 +254,7 @@ export const usePlayerStore = defineStore("player", {
               if (quietSince === 0) quietSince = Date.now();
               else if (Date.now() - quietSince > 1100) {
                 quietSince = 0;
-                void this.next(true);
+                if (!useTogetherStore().isGuest) void this.next(true);
               }
             } else {
               quietSince = 0;
@@ -269,6 +272,7 @@ export const usePlayerStore = defineStore("player", {
       };
       audio.onended = () => {
         if (useSleepStore().onTrackEnded()) return;
+        if (useTogetherStore().isGuest) return;
         void this.next(true);
       };
       audio.onplay = () => {
@@ -487,31 +491,30 @@ export const usePlayerStore = defineStore("player", {
           .catch(() => undefined);
         radioStarted = true;
 
-        const cachedLast = readCache<Track[]>(`wave.last.${station}`) ?? [];
         const history = readCache<string[]>(WAVE_HISTORY_KEY) ?? [];
-        let cursor: string | undefined =
-          this.seenIds[this.seenIds.length - 1] ??
-          history[history.length - 1] ??
-          cachedLast[cachedLast.length - 1]?.id;
 
         const recent = new Set<string>([...history, ...this.seenIds]);
         const fresh: Track[] = [];
         let batchId: string | null = null;
         let fallback: Track[] = [];
+        let sessionId: string | null = null;
+        const delivered: string[] = [];
 
         for (let attempt = 0; attempt < 6 && fresh.length < 8; attempt++) {
-          const res = await api.wave(cursor, station);
+          const res = await api.wave(
+            sessionId ? { station, sessionId, queue: delivered } : { station },
+          );
+          if (res.radio_session_id) sessionId = res.radio_session_id;
           if (!res.tracks.length) break;
           batchId = res.batch_id ?? batchId;
           if (!fallback.length) fallback = res.tracks;
           for (const t of res.tracks) {
+            delivered.push(t.id);
             if (recent.has(t.id) || fresh.some((c) => c.id === t.id)) continue;
             recent.add(t.id);
             fresh.push(t);
           }
-          const nextCursor = res.tracks[res.tracks.length - 1]?.id;
-          if (!nextCursor || nextCursor === cursor) break;
-          cursor = nextCursor;
+          if (!sessionId) break;
         }
 
         let tracks = dedupeTracks(fresh);
@@ -533,6 +536,7 @@ export const usePlayerStore = defineStore("player", {
         if (stationName) this.stationName = stationName;
         else if (station === DEFAULT_STATION) this.stationName = "Моя волна";
         this.waveBatchId = batchId;
+        this.waveSessionId = sessionId;
         this.queue = [...tracks];
         this.sourceQueue = [...tracks];
         this.shuffle = false;
@@ -1082,6 +1086,7 @@ export const usePlayerStore = defineStore("player", {
     },
 
     async next(auto = false) {
+      if (useTogetherStore().isGuest) return;
       if (auto && this.repeat === "one") {
         audio.currentTime = 0;
         await safePlay();
@@ -1138,6 +1143,7 @@ export const usePlayerStore = defineStore("player", {
     },
 
     async armWave() {
+      if (useTogetherStore().isGuest) return;
       if (!this.isWave) return;
       radioStarted = false;
       const station = this.stationId ?? DEFAULT_STATION;
@@ -1156,7 +1162,12 @@ export const usePlayerStore = defineStore("player", {
 
     async rescueWave(station: string) {
       try {
-        const res = await api.wave(undefined, station);
+        const res = await api.wave(
+          this.waveSessionId
+            ? { station, sessionId: this.waveSessionId, queue: this.queue.map((t) => t.id) }
+            : { station },
+        );
+        if (res.radio_session_id) this.waveSessionId = res.radio_session_id;
         if (res.batch_id) this.waveBatchId = res.batch_id;
         const playing = this.current?.id;
         const all = dedupeTracks(res.tracks).filter((t) => t.id !== playing);
@@ -1180,12 +1191,13 @@ export const usePlayerStore = defineStore("player", {
     },
 
     async continueWithWave(): Promise<boolean> {
+      if (useTogetherStore().isGuest) return false;
       const ui = useUiStore().settings;
       const seed = this.queue[this.index] ?? this.current;
       const personal = ui.autoWaveSource === "personal" || !seed;
       const station = personal ? DEFAULT_STATION : `track:${seed?.id}`;
       try {
-        const res = await api.wave(undefined, station);
+        const res = await api.wave({ station });
         const all = dedupeTracks(res.tracks).filter((t) => t.id !== seed?.id);
         const inQueue = new Set(this.queue.map((t) => t.id));
         const fresh = all.filter((t) => !inQueue.has(t.id));
@@ -1197,6 +1209,7 @@ export const usePlayerStore = defineStore("player", {
           ? "Моя волна"
           : `Волна по «${seed?.title ?? "плейлисту"}»`;
         this.waveBatchId = res.batch_id ?? null;
+        this.waveSessionId = res.radio_session_id ?? null;
         this.isWave = true;
         radioStarted = false;
         await this.ensureRadioStarted();
@@ -1207,8 +1220,8 @@ export const usePlayerStore = defineStore("player", {
         this.index += 1;
         Notify.create({
           message: personal
-            ? "Очередь закончилась — включаю мою волну"
-            : "Очередь закончилась — включаю волну по плейлисту",
+            ? "Очередь закончилась - включаю мою волну"
+            : "Очередь закончилась - включаю волну по плейлисту",
         });
         log.info("queue continued with wave", station, tracks.length);
         await this.loadCurrent();
@@ -1270,6 +1283,7 @@ export const usePlayerStore = defineStore("player", {
     },
 
     async extendWave() {
+      if (useTogetherStore().isGuest) return 0;
       if (this.fetchingMore || !this.isWave) return 0;
       this.fetchingMore = true;
       let added = 0;
@@ -1277,11 +1291,16 @@ export const usePlayerStore = defineStore("player", {
         await this.ensureRadioStarted();
         const station = this.stationId ?? DEFAULT_STATION;
         for (let attempt = 0; attempt < 4 && added === 0; attempt++) {
-          const last = this.queue[this.queue.length - 1];
           const res = await api.wave(
-            attempt === 0 ? last?.id : undefined,
-            station,
+            this.waveSessionId
+              ? {
+                  station,
+                  sessionId: this.waveSessionId,
+                  queue: this.queue.map((t) => t.id),
+                }
+              : { station },
           );
+          if (res.radio_session_id) this.waveSessionId = res.radio_session_id;
           if (res.batch_id) this.waveBatchId = res.batch_id;
 
           const known = new Set([

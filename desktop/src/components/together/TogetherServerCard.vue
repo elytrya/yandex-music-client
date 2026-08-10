@@ -2,10 +2,7 @@
   <div class="setting-row">
     <div class="setting-copy">
       <b>Сервер</b>
-      <span>
-        Куда подключаемся. По умолчанию общий сервер mashiro. Можно вбить
-        свой адрес или 127.0.0.1:7332 для локального.
-      </span>
+      <span>Общий сервер по умолчанию. Можно указать свой адрес или 127.0.0.1:7332.</span>
     </div>
 
     <input
@@ -20,10 +17,7 @@
   <div v-if="!connected" class="setting-row">
     <div class="setting-copy">
       <b>Создать комнату</b>
-      <span>
-        Поднимем комнату на сервере и дадим код из шести слов — просто
-        перешлите его друзьям.
-      </span>
+      <span>Дадим код из шести слов - перешлите его друзьям.</span>
     </div>
 
     <button
@@ -39,7 +33,7 @@
   <div v-if="!connected" class="setting-row">
     <div class="setting-copy">
       <b>Войти по коду</b>
-      <span>Вставьте код из слов, который прислал друг.</span>
+      <span>Вставьте код, который прислал друг.</span>
     </div>
 
     <div class="together-controls">
@@ -80,7 +74,7 @@
       </button>
     </div>
 
-    <span>Перешлите эти шесть слов друзьям — по ним они войдут в комнату.</span>
+    <span>Шесть слов для входа. Перешлите их друзьям.</span>
   </div>
 
   <div v-if="connected" class="setting-row">
@@ -109,11 +103,7 @@
 
   <div v-if="advanced" class="together-invite">
     <b>Ключ-аккаунт</b>
-    <span>
-      Создаётся сам при первом входе и хранится на этом пк. Ничего
-      вводить не надо. Скопируйте эти слова, только если хотите зайти под
-      тем же именем на другом устройстве.
-    </span>
+    <span>Создаётся автоматически и хранится на этом устройстве. Скопируйте ключ, только чтобы войти под тем же именем на другом устройстве.</span>
 
     <div class="together-controls">
       <span class="together-seed-state">{{
@@ -147,11 +137,7 @@
     ></textarea>
 
     <div v-if="phrase" class="together-controls">
-      <button
-        class="settings-reset-button"
-        type="button"
-        @click="copy(phrase)"
-      >
+      <button class="settings-reset-button" type="button" @click="copy(phrase)">
         Скопировать
       </button>
 
@@ -167,12 +153,18 @@
   </div>
 
   <p v-if="reason" class="together-reason">{{ reason }}</p>
+
+  <button class="together-repo" type="button" @click="openRepo">
+    <Icon name="github" :size="14" />
+    <span>Исходный код сервера</span>
+  </button>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import Icon from "@/components/Icon.vue";
 import { copyText } from "@/lib/clipboard";
+import { api } from "@/api/client";
 import { seedExists, seedForget, seedNew, seedSet, seedShow } from "@/api/relay";
 import {
   createRoom,
@@ -186,6 +178,11 @@ import { useTogetherStore } from "@/stores/together/index";
 import { SERVER_KEY } from "@/stores/together/protocol";
 
 const DEFAULT_SERVER = "mashiro.onecorporation.cfd";
+const REPO_URL = "https://github.com/elytrya/mashiro-together";
+
+function openRepo() {
+  void api.openExternal(REPO_URL);
+}
 
 const together = useTogetherStore();
 
@@ -257,6 +254,29 @@ async function leave() {
 </script>
 
 <style scoped>
+.together-repo {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-faint, inherit);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.together-repo:hover {
+  color: var(--accent, inherit);
+  opacity: 1;
+  text-decoration: underline;
+}
+
 .together-controls {
   display: flex;
   flex-wrap: wrap;

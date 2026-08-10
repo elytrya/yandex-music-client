@@ -3,7 +3,7 @@
     <div class="settings-group-head">
       <h2>Текст песни</h2>
       <p>
-        Всё то же есть в самой панели текста — кнопка с шестерёнкой справа
+        Всё то же есть в самой панели текста - кнопка с шестерёнкой справа
         сверху.
       </p>
     </div>
@@ -12,7 +12,7 @@
       <div class="setting-copy">
         <b>Источник текста</b>
         <span>
-          «Авто» — сначала LRCLIB (там чаще есть синхронный текст), потом
+          «Авто» - сначала LRCLIB (там чаще есть синхронный текст), потом
           Genius. Яндекс не спрашивается, пока его не выберешь вручную. В самой
           панели источник переключается для одного трека.
         </span>
@@ -52,7 +52,7 @@
         <b>Свой шрифт</b>
         <span>
           Имя шрифта, установленного в системе. Можно перечислить несколько
-          через запятую — возьмётся первый доступный.
+          через запятую - возьмётся первый доступный.
         </span>
       </div>
       <input
@@ -84,7 +84,7 @@
       <div class="setting-copy">
         <b>Активная строка</b>
         <span>
-          «Караоке» заливает строку по ходу песни — нужен синхронный текст.
+          «Караоке» заливает строку по ходу песни - нужен синхронный текст.
         </span>
       </div>
       <div class="settings-choice">
@@ -215,6 +215,49 @@
       @update:model-value="ui.set('lyricsMotion', $event)"
     />
 
+    <SettingToggle
+      :model-value="ui.settings.lyricsShowCredits"
+      label="Участники записи"
+      description="Показывать продюсеров и авторов с Genius в подвале панели текста."
+      @update:model-value="ui.set('lyricsShowCredits', $event)"
+    />
+
+    <SettingToggle
+      :model-value="ui.settings.lyricsShowOrigin"
+      label="Подпись «Источник»"
+      description="Строка с названием сервиса, откуда загружен текст. Если выключить её и участников записи, подвал исчезнет."
+      @update:model-value="ui.set('lyricsShowOrigin', $event)"
+    />
+
+    <div class="settings-subgroup-head">Разборы Genius</div>
+
+    <SettingToggle
+      :model-value="ui.settings.lyricsAnnotations"
+      label="Разборы строк"
+      description="Отмечать строки, у которых на Genius есть аннотация. Работает и с синхронным текстом из LRCLIB."
+      @update:model-value="ui.set('lyricsAnnotations', $event)"
+    />
+
+    <div v-if="ui.settings.lyricsAnnotations" class="setting-row">
+      <div class="setting-copy">
+        <b>Как отмечать</b>
+        <span>
+          Левый клик по строке перематывает трек, правый - показывает значок
+          разбора, по нему откроется аннотация.
+        </span>
+      </div>
+      <div class="settings-choice">
+        <button
+          v-for="item in marks"
+          :key="item.value"
+          :class="{ on: ui.settings.lyricsAnnotationMark === item.value }"
+          @click="ui.set('lyricsAnnotationMark', item.value)"
+        >
+          {{ item.label }}
+        </button>
+      </div>
+    </div>
+
     <div class="setting-row">
       <div class="setting-copy">
         <b>Сбросить вид текста</b>
@@ -236,6 +279,7 @@ import SettingSlider from "@/components/settings/SettingSlider.vue";
 import SettingToggle from "@/components/settings/SettingToggle.vue";
 import type {
   LyricsAlign,
+  LyricsAnnotationMark,
   LyricsBackdrop,
   LyricsFont,
   LyricsHighlight,
@@ -279,5 +323,12 @@ const backdrops: Array<{ value: LyricsBackdrop; label: string }> = [
   { value: "cover", label: "Обложка" },
   { value: "gradient", label: "Градиент" },
   { value: "solid", label: "Без фона" },
+];
+
+const marks: Array<{ value: LyricsAnnotationMark; label: string }> = [
+  { value: "underline", label: "Подчёркивание" },
+  { value: "tint", label: "Заливка" },
+  { value: "dot", label: "Значок" },
+  { value: "off", label: "Без метки" },
 ];
 </script>

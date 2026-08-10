@@ -22,6 +22,7 @@ export type LyricsFont = "sans" | "serif" | "mono" | "custom";
 export type LyricsAlign = "left" | "center" | "right";
 export type LyricsBackdrop = "cover" | "gradient" | "solid";
 export type LyricsHighlight = "white" | "accent" | "karaoke";
+export type LyricsAnnotationMark = "off" | "underline" | "dot" | "tint";
 
 export const DEFAULT_DISCORD_CLIENT_ID = "1532382113821753354";
 
@@ -87,7 +88,12 @@ export interface InterfaceSettings {
   lyricsGlow: boolean;
   lyricsShowArtwork: boolean;
   lyricsMotion: boolean;
+  lyricsShowCredits: boolean;
+  lyricsShowOrigin: boolean;
+  lyricsAnnotations: boolean;
+  lyricsAnnotationMark: LyricsAnnotationMark;
   lyricsSource: LyricsSource;
+  togetherShowDock: boolean;
   discordEnabled: boolean;
   discordClientId: string;
   discordDetails: string;
@@ -175,7 +181,12 @@ export const defaultInterfaceSettings: InterfaceSettings = {
   lyricsGlow: true,
   lyricsShowArtwork: true,
   lyricsMotion: true,
+  lyricsShowCredits: true,
+  lyricsShowOrigin: true,
+  lyricsAnnotations: true,
+  lyricsAnnotationMark: "underline",
   lyricsSource: "auto",
+  togetherShowDock: true,
   discordEnabled: true,
   discordClientId: DEFAULT_DISCORD_CLIENT_ID,
   discordDetails: "{title}",

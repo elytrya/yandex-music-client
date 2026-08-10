@@ -120,7 +120,7 @@
       </div>
       <div class="lyrics-empty-sub">
         Можно поискать в другом источнике: LRCLIB даёт строки с таймингами,
-        Genius — полный текст с авторами.
+        Genius - полный текст с авторами.
       </div>
       <div class="lyrics-empty-actions">
         <button
@@ -237,6 +237,7 @@
             :class="[
               `align-${s.align}`,
               `hl-${s.highlight}`,
+              `ann-${markMode}`,
               { motion: s.motion && synced, plain: !synced },
             ]"
           >
@@ -246,52 +247,124 @@
                 :key="i"
                 :ref="(el) => setLineRef(el, i)"
                 class="lyric-line"
-                :class="lineClass(i)"
+                :class="[lineClass(i), { annotated: !!lineAnnotations[i] }]"
                 :style="i === player.activeLine ? fillStyle : undefined"
                 @click="seekTo(line.time_ms)"
+                @contextmenu.stop.prevent="onLineMenu($event, i)"
               >
-                {{ line.text || "…" }}
+                <span class="lyric-text">{{ line.text || "…" }}</span>
+                <span
+                  v-if="lineAnnotations[i]"
+                  class="lyric-note"
+                  title="Разбор строки"
+                  @click.stop="openAnnotation(lineAnnotations[i])"
+                >
+                  <Icon name="info" :size="13" />
+                </span>
               </button>
             </template>
             <div v-else class="lyrics-plain-text">
               <p
                 v-for="(line, i) in lines"
                 :key="i"
-                :class="{ 'lyric-part': isPart(line.text) }"
+                :class="{
+                  'lyric-part': isPart(line.text),
+                  annotated: !isPart(line.text) && !!lineAnnotations[i],
+                }"
+                @click="
+                  !isPart(line.text) &&
+                  lineAnnotations[i] &&
+                  openAnnotation(lineAnnotations[i])
+                "
+                @contextmenu.stop.prevent="onLineMenu($event, i)"
               >
-                {{ partLabel(line.text) }}
+                <span class="lyric-text">{{ partLabel(line.text) }}</span>
+                <span
+                  v-if="!isPart(line.text) && lineAnnotations[i]"
+                  class="lyric-note"
+                  title="Разбор строки"
+                  @click.stop="openAnnotation(lineAnnotations[i])"
+                >
+                  <Icon name="info" :size="12" />
+                </span>
               </p>
             </div>
           </div>
         </q-scroll-area>
       </div>
 
-      <div class="lyrics-foot">
-        <span v-if="originTag"
+      <div v-if="footVisible" class="lyrics-foot">
+        <span v-if="originTag && ui.settings.lyricsShowOrigin"
           >Источник: <b>{{ originTag }}</b></span
         >
 
-        <span v-if="credits.length" class="lyrics-people">
-          <button
-            v-for="person in credits"
-            :key="`${person.id}-${person.role}-${person.name}`"
-            type="button"
-            class="lyrics-person"
-            @click="openPerson(person)"
+        <template v-if="creditsVisible">
+          <span v-if="credits.length" class="lyrics-people">
+            <button
+              v-for="person in credits"
+              :key="`${person.id}-${person.role}-${person.name}`"
+              type="button"
+              class="lyrics-person"
+              @click="openPerson(person)"
+            >
+              <img v-if="person.image" :src="person.image" alt="" />
+              <span v-else class="lyrics-person-dot">{{
+                person.name.slice(0, 1)
+              }}</span>
+              <span>{{ person.name }}</span>
+              <i>{{ person.role }}</i>
+            </button>
+          </span>
+          <span v-else-if="writers"
+            >Авторы: <b>{{ writers }}</b></span
           >
-            <img v-if="person.image" :src="person.image" alt="" />
-            <span v-else class="lyrics-person-dot">{{
-              person.name.slice(0, 1)
-            }}</span>
-            <span>{{ person.name }}</span>
-            <i>{{ person.role }}</i>
-          </button>
-        </span>
-        <span v-else-if="writers"
-          >Авторы: <b>{{ writers }}</b></span
-        >
+        </template>
       </div>
     </template>
+
+    <button
+      v-if="hint"
+      ref="hintEl"
+      type="button"
+      class="lyric-hint"
+      :style="{ left: `${hint.x}px`, top: `${hint.y}px` }"
+      @click.stop="openHint"
+    >
+      <Icon name="info" :size="14" />
+      <span>Разбор строки</span>
+    </button>
+
+    <q-dialog v-model="annotationOpen">
+      <div class="ann-card">
+        <div class="ann-head">
+          <div class="ann-title ellipsis">{{ player.current?.title }}</div>
+          <div class="icon-btn round" @click="annotationOpen = false">
+            <Icon name="close" :size="16" />
+          </div>
+        </div>
+        <div v-if="activeAnnotation" class="ann-frag">
+          {{ activeAnnotation.fragment }}
+        </div>
+        <p v-if="activeAnnotation" class="ann-text">
+          {{ activeAnnotation.text }}
+        </p>
+        <div class="ann-foot">
+          <span class="ann-by ellipsis">
+            {{
+              activeAnnotation?.authors?.length
+                ? activeAnnotation.authors.map((a) => a.name).join(", ")
+                : "Genius"
+            }}
+          </span>
+          <a
+            v-if="activeAnnotation?.url"
+            class="ann-link"
+            @click.prevent="openUrl(activeAnnotation.url)"
+            >Источник</a
+          >
+        </div>
+      </div>
+    </q-dialog>
 
     <TrackMenu
       v-if="player.current"
@@ -308,6 +381,8 @@ import { useRoute, useRouter } from "vue-router";
 import Icon from "@/components/Icon.vue";
 import LyricsSettingsPanel from "@/components/lyrics/LyricsSettingsPanel.vue";
 import TrackMenu from "@/components/TrackMenu.vue";
+import { api } from "@/api/client";
+import type { GeniusQuote } from "@/api/types";
 import { audio } from "@/lib/audio";
 import { artistNames } from "@/lib/format";
 import { ORIGIN_LABEL } from "@/lib/lyricsSource";
@@ -341,7 +416,13 @@ const s = computed(() => ({
   glow: ui.settings.lyricsGlow,
   showArtwork: ui.settings.lyricsShowArtwork,
   motion: ui.settings.lyricsMotion,
+  annotations: ui.settings.lyricsAnnotations,
+  annotationMark: ui.settings.lyricsAnnotationMark,
 }));
+
+const markMode = computed(() =>
+  s.value.annotations ? s.value.annotationMark : "off",
+);
 
 const showSettings = ref(false);
 const scroller = ref<QScrollArea | null>(null);
@@ -408,6 +489,120 @@ function openPerson(person: Credit) {
   });
 }
 
+const annotations = computed<GeniusQuote[]>(() => {
+  const current = player.current;
+  if (!current || genius.songKey !== String(current.id)) return [];
+  return genius.song?.quotes || [];
+});
+
+function normText(value: string): string {
+  return (value || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} ]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function annotationFor(text: string): GeniusQuote | null {
+  const line = normText(text);
+  if (line.length < 6) return null;
+
+  for (const quote of annotations.value) {
+    const frag = normText(quote.fragment);
+    if (!frag) continue;
+    if (frag.includes(line) || line.includes(frag)) return quote;
+
+    // Фрагмент с Genius часто из нескольких строк, а в LRCLIB они разделены.
+    const parts = (quote.fragment || "")
+      .split(/\r?\n/)
+      .map(normText)
+      .filter((part) => part.length >= 6);
+    if (parts.some((part) => part === line || part.includes(line))) {
+      return quote;
+    }
+  }
+  return null;
+}
+
+const lineAnnotations = computed<Array<GeniusQuote | null>>(() => {
+  if (!s.value.annotations) return lines.value.map(() => null);
+  return lines.value.map((line) => annotationFor(line.text));
+});
+
+const activeAnnotation = ref<GeniusQuote | null>(null);
+const annotationOpen = computed({
+  get: () => !!activeAnnotation.value,
+  set: (value: boolean) => {
+    if (!value) activeAnnotation.value = null;
+  },
+});
+
+function openAnnotation(quote: GeniusQuote | null) {
+  if (quote) activeAnnotation.value = quote;
+  hint.value = null;
+}
+
+const hintEl = ref<HTMLElement | null>(null);
+const hint = ref<{ x: number; y: number; quote: GeniusQuote } | null>(null);
+
+function onLineMenu(event: MouseEvent, index: number) {
+  const quote = lineAnnotations.value[index];
+  if (!quote) {
+    hint.value = null;
+    return;
+  }
+  hint.value = {
+    x: Math.min(event.clientX, window.innerWidth - 190),
+    y: Math.min(event.clientY, window.innerHeight - 60),
+    quote,
+  };
+}
+
+function openHint() {
+  openAnnotation(hint.value?.quote ?? null);
+}
+
+function closeHint(event?: Event) {
+  if (!hint.value) return;
+  const el = hintEl.value;
+  if (event && el && event.composedPath().includes(el)) return;
+  hint.value = null;
+}
+
+function onHintKey(event: KeyboardEvent) {
+  if (event.key === "Escape") hint.value = null;
+}
+
+window.addEventListener("pointerdown", closeHint);
+window.addEventListener("wheel", closeHint, { passive: true });
+window.addEventListener("keydown", onHintKey);
+
+onBeforeUnmount(() => {
+  window.removeEventListener("pointerdown", closeHint);
+  window.removeEventListener("wheel", closeHint);
+  window.removeEventListener("keydown", onHintKey);
+});
+
+watch(
+  () => player.current?.id,
+  () => {
+    hint.value = null;
+    activeAnnotation.value = null;
+  },
+);
+
+function openUrl(url: string) {
+  if (url) void api.openExternal(url);
+}
+
+watch(
+  () => [player.showLyrics, player.current?.id] as const,
+  ([shown, id]) => {
+    if (shown && id && genius.ready) void genius.fetchSong(player.current);
+  },
+  { immediate: true },
+);
+
 function isPart(text: string): boolean {
   const value = (text || "").trim();
   return value.length > 2 && value.startsWith("[") && value.endsWith("]");
@@ -439,6 +634,18 @@ const originTag = computed(() => {
   if (!origin || !lines.value.length) return "";
   return ORIGIN_LABEL[origin];
 });
+
+const creditsVisible = computed(
+  () =>
+    ui.settings.lyricsShowCredits &&
+    (credits.value.length > 0 || Boolean(writers.value)),
+);
+
+const footVisible = computed(
+  () =>
+    creditsVisible.value ||
+    (ui.settings.lyricsShowOrigin && Boolean(originTag.value)),
+);
 
 async function choose(id: SourcePick, force = false) {
   await player.setLyricsSource(id === "auto" ? null : id, force);

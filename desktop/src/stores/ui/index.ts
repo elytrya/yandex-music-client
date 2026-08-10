@@ -298,6 +298,10 @@ export const useUiStore = defineStore("ui", {
       this.settings.lyricsGlow = d.lyricsGlow;
       this.settings.lyricsShowArtwork = d.lyricsShowArtwork;
       this.settings.lyricsMotion = d.lyricsMotion;
+      this.settings.lyricsShowCredits = d.lyricsShowCredits;
+      this.settings.lyricsShowOrigin = d.lyricsShowOrigin;
+      this.settings.lyricsAnnotations = d.lyricsAnnotations;
+      this.settings.lyricsAnnotationMark = d.lyricsAnnotationMark;
       this.settings.lyricsSource = d.lyricsSource;
       this.apply();
     },

@@ -1,14 +1,34 @@
 use super::*;
 
+#[derive(serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct YRotorSession {
+    radio_session_id: Option<String>,
+    batch_id: Option<String>,
+    sequence: Vec<YTrackWrap>,
+}
+
 impl Yandex {
-    pub async fn wave(&self, station: &str, queue: Option<&str>) -> Result<WaveResponse, String> {
-        let mut path = format!("/rotor/station/{station}/tracks?settings2=true");
-        if let Some(q) = queue {
-            path.push_str(&format!("&queue={q}"));
-        }
-        let result = self.get_result(&path).await?;
-        let rotor: YRotor = serde_json::from_value(result).map_err(|e| e.to_string())?;
-        let tracks = rotor
+    pub async fn wave_session(
+        &self,
+        station: &str,
+        session_id: Option<&str>,
+        queue: &[String],
+    ) -> Result<WaveResponse, String> {
+        let (path, body) = match session_id {
+            Some(sid) => (
+                format!("/rotor/session/{sid}/tracks"),
+                serde_json::json!({ "queue": queue }),
+            ),
+            None => (
+                "/rotor/session/new".to_string(),
+                serde_json::json!({ "seeds": [station], "includeTracksInResponse": true }),
+            ),
+        };
+        let result = self.post_value(&path, body).await?;
+        let parsed: YRotorSession =
+            serde_json::from_value(result).map_err(|e| e.to_string())?;
+        let tracks = parsed
             .sequence
             .iter()
             .filter_map(|w| w.track.as_ref())
@@ -16,7 +36,10 @@ impl Yandex {
             .collect();
         Ok(WaveResponse {
             station_id: station.to_string(),
-            batch_id: rotor.batch_id,
+            radio_session_id: parsed
+                .radio_session_id
+                .or_else(|| session_id.map(|s| s.to_string())),
+            batch_id: parsed.batch_id,
             tracks,
         })
     }

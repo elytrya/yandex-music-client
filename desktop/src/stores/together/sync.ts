@@ -1,8 +1,8 @@
 import { api } from "@/api/client";
 import type { usePlayerStore } from "@/stores/player/index";
 import type { StatePayload } from "./protocol";
-import { DRIFT_LIMIT } from "./protocol";
-import { findIndex, trimQueue } from "./queue";
+import { DRIFT_LIMIT, SYNC_BUDGET } from "./protocol";
+import { fitBudget, findIndex, trimQueue } from "./queue";
 
 type Player = ReturnType<typeof usePlayerStore>;
 
@@ -10,11 +10,7 @@ type Player = ReturnType<typeof usePlayerStore>;
  * @param withQueue полное состояние с очередью или лёгкий пульс без неё
  */
 export function buildState(player: Player, withQueue = true): StatePayload {
-  const slice = withQueue
-    ? trimQueue(player.queue, player.index)
-    : { queue: [], index: 0 };
-
-  return {
+  const base: StatePayload = {
     kind: "state",
     trackId: player.current?.id ?? null,
     positionMs: Math.round(player.progress * 1000),
@@ -22,9 +18,19 @@ export function buildState(player: Player, withQueue = true): StatePayload {
     updatedAt: Date.now(),
     title: player.current?.title ?? null,
     track: player.current ?? null,
-    queue: slice.queue,
-    index: slice.index,
+    queue: [],
+    index: 0,
   };
+
+  if (!withQueue) return base;
+
+  const slice = fitBudget(
+    base,
+    trimQueue(player.queue, player.index),
+    SYNC_BUDGET,
+  );
+
+  return { ...base, queue: slice.queue, index: slice.index };
 }
 
 export function expectedPosition(payload: StatePayload): number {
@@ -59,7 +65,7 @@ async function startTrack(
 ): Promise<void> {
   const trackId = payload.trackId!;
 
-  // прислали очередь — повторяем её целиком, тогда работает и дальше/назад
+  // прислали очередь - повторяем её целиком, тогда работает и дальше/назад
   if (payload.queue.length) {
     const index = findIndex(payload.queue, payload.index, trackId);
     if (index >= 0) {

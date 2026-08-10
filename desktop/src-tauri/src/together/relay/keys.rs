@@ -1,3 +1,5 @@
+use std::env;
+
 use ed25519_dalek::SigningKey;
 use keyring::Entry;
 use together_crypto::encoding::to_base64;
@@ -7,8 +9,31 @@ pub const SERVICE: &str = "mashiro-together";
 
 pub const ACCOUNT: &str = "seed-phrase";
 
+const ACCOUNT_ENV: &str = "MASHIRO_TOGETHER_ACCOUNT";
+
+const SEED_ENV: &str = "MASHIRO_TOGETHER_SEED";
+
+fn account() -> String {
+    match env::var(ACCOUNT_ENV) {
+        Ok(suffix) if !suffix.trim().is_empty() => format!("{ACCOUNT}-{}", suffix.trim()),
+        _ => ACCOUNT.to_string(),
+    }
+}
+
+fn env_seed() -> Option<String> {
+    let raw = env::var(SEED_ENV).ok()?;
+    let normalized = identity::normalize_phrase(&raw);
+    if normalized.is_empty() {
+        return None;
+    }
+
+    identity::keypair_from_phrase(&normalized).ok()?;
+    Some(normalized)
+}
+
 fn entry() -> Result<Entry, String> {
-    Entry::new(SERVICE, ACCOUNT).map_err(|error| format!("хранилище ключей недоступно: {error}"))
+    Entry::new(SERVICE, &account())
+        .map_err(|error| format!("хранилище ключей недоступно: {error}"))
 }
 
 pub fn save(phrase: &str) -> Result<String, String> {
@@ -23,6 +48,10 @@ pub fn save(phrase: &str) -> Result<String, String> {
 }
 
 pub fn load() -> Result<Option<String>, String> {
+    if let Some(seed) = env_seed() {
+        return Ok(Some(seed));
+    }
+
     match entry()?.get_password() {
         Ok(phrase) => Ok(Some(phrase)),
         Err(keyring::Error::NoEntry) => Ok(None),

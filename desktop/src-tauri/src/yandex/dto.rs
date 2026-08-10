@@ -158,6 +158,7 @@ pub struct SearchDto {
 #[derive(Serialize)]
 pub struct WaveResponse {
     pub station_id: String,
+    pub radio_session_id: Option<String>,
     pub batch_id: Option<String>,
     pub tracks: Vec<TrackDto>,
 }

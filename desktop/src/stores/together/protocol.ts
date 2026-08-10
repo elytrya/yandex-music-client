@@ -19,6 +19,8 @@ export const PUSH_DEBOUNCE = 80;
 
 export const QUEUE_LIMIT = 120;
 
+export const SYNC_BUDGET = 40 * 1024;
+
 export const HANDOFF_DELAY = 900;
 
 export const HANDOFF_RETRIES = 6;

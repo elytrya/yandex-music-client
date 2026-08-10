@@ -100,6 +100,35 @@ impl Yandex {
             .unwrap_or(serde_json::Value::Null))
     }
 
+    async fn post_value(
+        &self,
+        path: &str,
+        body: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let resp = self
+            .http
+            .post(format!("{BASE}{path}"))
+            .header("Authorization", self.auth())
+            .header("X-Yandex-Music-Client", MUSIC_CLIENT)
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let status = resp.status();
+        if status.as_u16() == 401 {
+            return Err("Невалидный токен Яндекс Музыки".to_string());
+        }
+        let val: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+        if !status.is_success() {
+            return Err(format!("Ошибка API Яндекса: {status}"));
+        }
+        Ok(val
+            .get("result")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null))
+    }
+
     async fn post_json(&self, path: &str) -> Result<serde_json::Value, String> {
         let resp = self
             .http

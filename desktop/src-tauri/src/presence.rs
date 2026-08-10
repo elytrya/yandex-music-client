@@ -149,6 +149,12 @@ pub struct PresencePayload {
     pub button_label: String,
     pub started_at: Option<i64>,
     pub ends_at: Option<i64>,
+    #[serde(default)]
+    pub party_id: Option<String>,
+    #[serde(default)]
+    pub party_size: Option<u32>,
+    #[serde(default)]
+    pub party_max: Option<u32>,
 }
 
 #[derive(Serialize, Default)]
@@ -309,6 +315,18 @@ fn activity_json(payload: &PresencePayload, level: u8) -> serde_json::Value {
     }
 
     if level == 0 {
+        if let Some(size) = payload.party_size.filter(|n| *n > 0) {
+            let max = payload.party_max.unwrap_or(size).max(size);
+            let id = payload
+                .party_id
+                .clone()
+                .unwrap_or_else(|| "mashiro-together".to_string());
+            map.insert(
+                "party".to_string(),
+                serde_json::json!({ "id": id, "size": [size, max] }),
+            );
+        }
+
         let label = payload.button_label.trim();
         if !label.is_empty() && payload.track_url.starts_with("https://") {
             let short: String = label.chars().take(31).collect();

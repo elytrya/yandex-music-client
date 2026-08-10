@@ -156,7 +156,7 @@
         v-close-popup
         @click="toggleCensorVersion"
       >
-        <Icon :name="playsOriginal ? 'heartOff' : 'apple'" :size="18" />
+        <Icon :name="playsOriginal ? 'heartOff' : 'yandexmusic'" :size="18" />
         <span>{{
           playsOriginal
             ? "Играть версию без цензуры"

@@ -25,14 +25,15 @@ fn default_station() -> String {
 
 #[tauri::command]
 pub async fn get_wave(
-    queue: Option<String>,
+    queue: Option<Vec<String>>,
+    session: Option<String>,
     station: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<WaveResponse, String> {
-    let session = state.session()?;
+    let sess = state.session()?;
     let station = station.unwrap_or_else(|| DEFAULT_STATION.to_string());
-    Yandex::new(&session.token)
-        .wave(&station, queue.as_deref())
+    Yandex::new(&sess.token)
+        .wave_session(&station, session.as_deref(), &queue.unwrap_or_default())
         .await
 }
 

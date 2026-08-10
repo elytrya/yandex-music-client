@@ -249,6 +249,68 @@
     </div>
 
     <div class="lset-group">
+      <div class="lset-group-head">Разборы Genius</div>
+
+      <button
+        type="button"
+        class="lset-switch"
+        :class="{ on: s.lyricsAnnotations }"
+        @click="ui.set('lyricsAnnotations', !s.lyricsAnnotations)"
+      >
+        <span>Отмечать строки с разбором</span>
+        <span class="lset-track"><i /></span>
+      </button>
+
+      <template v-if="s.lyricsAnnotations">
+        <div class="lset-label">Как отмечать</div>
+        <div class="lset-seg">
+          <button
+            v-for="item in marks"
+            :key="item.id"
+            type="button"
+            :class="{ on: s.lyricsAnnotationMark === item.id }"
+            @click="ui.set('lyricsAnnotationMark', item.id)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+        <div class="lset-hint">
+          Левый клик по строке перематывает трек, правый - показывает значок
+          разбора. Нужен включённый Genius с токеном.
+        </div>
+      </template>
+    </div>
+
+    <div class="lset-group">
+      <div class="lset-group-head">Подвал панели</div>
+
+      <button
+        type="button"
+        class="lset-switch"
+        :class="{ on: s.lyricsShowCredits }"
+        @click="ui.set('lyricsShowCredits', !s.lyricsShowCredits)"
+      >
+        <span>Продюсеры и авторы</span>
+        <span class="lset-track"><i /></span>
+      </button>
+
+      <button
+        type="button"
+        class="lset-switch"
+        :class="{ on: s.lyricsShowOrigin }"
+        @click="ui.set('lyricsShowOrigin', !s.lyricsShowOrigin)"
+      >
+        <span>Подпись «Источник»</span>
+        <span class="lset-track"><i /></span>
+      </button>
+
+      <div class="lset-hint">
+        Строка внизу с участниками записи с Genius. Если выключить оба пункта,
+        подвал пропадёт полностью.
+      </div>
+    </div>
+
+    <div class="lset-group">
       <div class="lset-group-head">Источник по умолчанию</div>
       <div class="lset-seg">
         <button
@@ -262,8 +324,9 @@
         </button>
       </div>
       <div class="lset-hint">
-        Авто: сначала LRCLIB (синхрон), потом Genius. Кнопки вверху меняют
-        источник только для текущего трека.
+        Авто: сначала LRCLIB (синхрон), потом Genius. Разборы с Genius
+        подтягиваются к синхронному тексту LRCLIB. Кнопки вверху меняют источник
+        только для текущего трека.
       </div>
     </div>
   </div>
@@ -273,6 +336,7 @@
 import { computed, ref, watch } from "vue";
 import type {
   LyricsAlign,
+  LyricsAnnotationMark,
   LyricsBackdrop,
   LyricsFont,
   LyricsHighlight,
@@ -475,6 +539,13 @@ const backdrops: Array<{ id: LyricsBackdrop; label: string }> = [
   { id: "cover", label: "Обложка" },
   { id: "gradient", label: "Градиент" },
   { id: "solid", label: "Без фона" },
+];
+
+const marks: Array<{ id: LyricsAnnotationMark; label: string }> = [
+  { id: "underline", label: "Подчёркивание" },
+  { id: "tint", label: "Заливка" },
+  { id: "dot", label: "Значок" },
+  { id: "off", label: "Без метки" },
 ];
 
 const lyricsSources: Array<{ id: LyricsSource; label: string }> = [

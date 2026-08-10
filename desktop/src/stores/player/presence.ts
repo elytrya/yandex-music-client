@@ -1,6 +1,7 @@
 import { api } from "@/api/client";
 import type { Track } from "@/api/types";
 import { DEFAULT_DISCORD_CLIENT_ID, useUiStore } from "@/stores/ui/index";
+import { useTogetherStore } from "@/stores/together/index";
 
 export interface PresenceContext {
   track: Track | null;
@@ -62,14 +63,33 @@ export async function syncDiscordPresence(
   const now = Math.floor(Date.now() / 1000);
   const artists = track.artists.map((item) => item.name).join(", ");
 
+  const together = useTogetherStore();
+  let stateText = clampLine(
+    template(settings.discordState, track),
+    artists || "Яндекс Музыка",
+  );
+  let party: { id: string; size: number; max: number } | null = null;
+  if (together.active) {
+    const size = Math.max(1, together.peers.length);
+    const note = together.isHost
+      ? size > 1
+        ? `в группе · ${size}`
+        : "в группе"
+      : `в группе с ${together.hostNick}`;
+    stateText = clampLine(`${stateText} · 🎧 ${note}`, `🎧 ${note}`);
+    const room = together.invite || "together";
+    party = {
+      id: `mashiro:${room}`.slice(0, 128),
+      size,
+      max: Math.max(size, 2),
+    };
+  }
+
   const payload = {
     enabled: true,
     applicationId: clientId,
     details: clampLine(template(settings.discordDetails, track), track.title),
-    state: clampLine(
-      template(settings.discordState, track),
-      artists || "Яндекс Музыка",
-    ),
+    state: stateText,
     album: clampLine(track.album_title || track.title, track.title),
     coverUrl: settings.discordShowArtwork
       ? normalizeCover(track.cover_url)
@@ -83,6 +103,9 @@ export async function syncDiscordPresence(
     endsAt: timed
       ? now + Math.max(1, Math.floor((duration - context.progress) / rate))
       : null,
+    partyId: party?.id ?? null,
+    partySize: party?.size ?? null,
+    partyMax: party?.max ?? null,
   };
 
   const signature = JSON.stringify({

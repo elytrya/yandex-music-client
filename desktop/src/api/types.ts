@@ -86,6 +86,7 @@ export type RepeatMode = "off" | "all" | "one";
 
 export interface WaveResponse {
   station_id: string;
+  radio_session_id: string | null;
   batch_id: string | null;
   tracks: Track[];
 }
@@ -344,4 +345,7 @@ export interface PresencePayload {
   buttonLabel: string;
   startedAt: number | null;
   endsAt: number | null;
+  partyId: string | null;
+  partySize: number | null;
+  partyMax: number | null;
 }
