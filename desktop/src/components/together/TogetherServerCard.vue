@@ -2,7 +2,10 @@
   <div class="setting-row">
     <div class="setting-copy">
       <b>Сервер</b>
-      <span>Общий сервер по умолчанию. Можно указать свой адрес или 127.0.0.1:7332.</span>
+      <span
+        >Общий сервер по умолчанию. Можно указать свой адрес или
+        127.0.0.1:7332.</span
+      >
     </div>
 
     <input
@@ -103,7 +106,10 @@
 
   <div v-if="advanced" class="together-invite">
     <b>Ключ-аккаунт</b>
-    <span>Создаётся автоматически и хранится на этом устройстве. Скопируйте ключ, только чтобы войти под тем же именем на другом устройстве.</span>
+    <span
+      >Создаётся автоматически и хранится на этом устройстве. Скопируйте ключ,
+      только чтобы войти под тем же именем на другом устройстве.</span
+    >
 
     <div class="together-controls">
       <span class="together-seed-state">{{
@@ -154,10 +160,26 @@
 
   <p v-if="reason" class="together-reason">{{ reason }}</p>
 
-  <button class="together-repo" type="button" @click="openRepo">
-    <Icon name="github" :size="14" />
-    <span>Исходный код сервера</span>
-  </button>
+  <div class="together-repo">
+    <div class="together-repo-copy">
+      <b>Можно поднять свой сервер</b>
+      <span>
+        Общий сервер - просто удобство. Исходники и инструкция открыты:
+        запустите свой и впишите его адрес в поле выше.
+      </span>
+    </div>
+
+    <button
+      class="together-repo-link"
+      type="button"
+      title="Открыть репозиторий в браузере"
+      @click="openRepo"
+    >
+      <Icon name="github" :size="15" />
+      <span>Посмотреть репорзиторий</span>
+      <Icon name="chevronRight" :size="13" class="together-repo-arrow" />
+    </button>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -165,7 +187,13 @@ import { computed, onMounted, ref } from "vue";
 import Icon from "@/components/Icon.vue";
 import { copyText } from "@/lib/clipboard";
 import { api } from "@/api/client";
-import { seedExists, seedForget, seedNew, seedSet, seedShow } from "@/api/relay";
+import {
+  seedExists,
+  seedForget,
+  seedNew,
+  seedSet,
+  seedShow,
+} from "@/api/relay";
 import {
   createRoom,
   joinRoom,
@@ -179,6 +207,7 @@ import { SERVER_KEY } from "@/stores/together/protocol";
 
 const DEFAULT_SERVER = "mashiro.onecorporation.cfd";
 const REPO_URL = "https://github.com/elytrya/mashiro-together";
+const repoLabel = REPO_URL.replace(/^https?:\/\/(www\.)?/, "");
 
 function openRepo() {
   void api.openExternal(REPO_URL);
@@ -255,26 +284,69 @@ async function leave() {
 
 <style scoped>
 .together-repo {
-  display: inline-flex;
-  align-self: flex-start;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 2px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fg-faint, inherit);
-  font: inherit;
-  font-size: 12px;
-  text-decoration: none;
-  cursor: pointer;
-  transition: color 0.15s ease;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  margin-bottom: 15px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.1));
 }
 
-.together-repo:hover {
-  color: var(--accent, inherit);
-  opacity: 1;
-  text-decoration: underline;
+.together-repo-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 220px;
+  flex: 1 1 240px;
+}
+
+.together-repo-copy b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.together-repo-copy span {
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.6;
+}
+
+.together-repo-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px 7px 11px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 9px;
+  background: transparent;
+  color: var(--fg-dim, inherit);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.together-repo-link:hover {
+  border-color: var(--accent, rgba(255, 255, 255, 0.3));
+  background: var(--hover, rgba(255, 255, 255, 0.06));
+  color: var(--fg, inherit);
+}
+
+.together-repo-arrow {
+  opacity: 0.45;
+  transition: transform 0.15s ease;
+}
+
+.together-repo-link:hover .together-repo-arrow {
+  opacity: 0.8;
+  transform: translateX(2px);
 }
 
 .together-controls {
