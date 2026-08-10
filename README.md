@@ -199,6 +199,55 @@
 - переключатели обложек в боковой панели и в плеере
 - настраиваемые размеры интерфейса, плотность списков и форма обложек
 
+
+<div align="center">
+​
+<table>
+<tr>
+<td width="50%"><img src="assets/screenshots/screenshot_2.png" alt="mashiro" /></td>
+<td width="50%"><img src="assets/screenshots/screenshot_3.png" alt="mashiro" /></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/screenshot_4.png" alt="mashiro" /></td>
+<td width="50%"><img src="assets/screenshots/screenshot_5.png" alt="mashiro" /></td>
+</tr>
+</table>
+​
+<details>
+<summary><b>ещё 12 скриншотов</b></summary>
+<br />
+​
+<table>
+<tr>
+<td width="50%"><img src="assets/screenshots/screenshot_6.png" alt="mashiro" /></td>
+<td width="50%"><img src="assets/screenshots/screenshot_7.png" alt="mashiro" /></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/screenshot_8.png" alt="mashiro" /></td>
+<td width="50%"><img src="assets/screenshots/screenshot_9.png" alt="mashiro" /></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/screenshot_10.png" alt="mashiro" /></td>
+<td width="50%"><img src="assets/screenshots/screenshot_11.png" alt="mashiro" /></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/screenshot_12.png" alt="mashiro" /></td>
+<td width="50%"><img src="assets/screenshots/screenshot_13.png" alt="mashiro" /></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/screenshot_14.png" alt="mashiro" /></td>
+<td width="50%"><img src="assets/screenshots/screenshot_15.png" alt="mashiro" /></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/screenshot_16.png" alt="mashiro" /></td>
+<td width="50%"><img src="assets/screenshots/screenshot_17.png" alt="mashiro" /></td>
+</tr>
+</table>
+​
+</details>
+​
+</div>
+
 ## настройки
 
 разделы: оформление, интерфейс, плеер, мини-плеер, поведение, плейлисты,
