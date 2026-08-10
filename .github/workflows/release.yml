@@ -68,5 +68,5 @@ jobs:
           releaseName: mashiro ${{ github.ref_name }}
           releaseBody: "сборки для windows, macos и linux"
           releaseDraft: true
-          prerelease: true
+          prerelease: false
           args: ${{ matrix.args }}
